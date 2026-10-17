@@ -1,0 +1,9 @@
+# Supabase CLI settings for Element10's Edge Functions. Keep JWT verification ON (the functions also confirm the login themselves).
+[functions.spapi]
+verify_jwt = true
+[functions.keepa]
+verify_jwt = true
+[functions.dataforseo]
+verify_jwt = true
+[functions.status]
+verify_jwt = true

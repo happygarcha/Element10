@@ -3,6 +3,7 @@
 These drive the real pages with Playwright.
 - `local.e2e.mjs`: local mode (IndexedDB): import, calculator, watchlist alert, inventory, audit, ads, backup, demo isolation.
 - `login.e2e.mjs`: login flow against an in-memory STAND-IN for Supabase (`supabase.stub.js`). It proves the app's login,
+- `phase2.e2e.mjs`: mobile layout, live-data buttons, keyword lookup, suppliers, rank tracker, security check, PWA files (stand-in Supabase with test fixtures).
   write and reload logic, NOT the real Supabase service. Test-only; never deployed.
 
 Run (from `web/`): serve the folder (`python3 -m http.server 8771`), then `npm i playwright-core` somewhere and

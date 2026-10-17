@@ -11,6 +11,7 @@ import { feeProfile, fxFor, fxRates, latest, productRows, saveCalc, saveFeeProfi
 import { TABLES } from "./store.js";
 import { download, h, kindChip, mpChip, raw, spark, toCSV } from "./ui.js";
 import { CURRENCY, fnum, money, now, num } from "./util.js";
+import { keywordLookup, liveCard, liveStatus, securityCard, snapshot, snapshotHtml } from "./views2.js";
 
 const cell = (lat, key, d = 0) => { const o = lat[key]; return o && o.value_num != null ? h`<span title="${o.kind.replace("_", " ")} · ${o.source} · ${(o.as_of || "").slice(0, 10)}">${num(o.value_num, d)}</span>` : raw("–"); };
 const short = (s, n = 60) => ((s || "").length > n ? s.slice(0, n) + "…" : s || "");
@@ -37,7 +38,8 @@ export async function home({ store, mode }) {
 }
 
 /* ---------------- products ---------------- */
-export async function products({ store, q }) {
+export async function products({ store, q, refresh }) {
+  const saved = store.setting("saved_searches", []);
   const f = {}; for (const k of ["marketplace", "q", "category", "sort", "dir"]) if (q.get(k)) f[k] = q.get(k);
   for (const k of ["price_min", "price_max", "reviews_max", "rating_max", "rank_min", "rank_max", "units_min", "margin_min"]) f[k] = fnum(q.get(k));
   const rows = productRows(store, f), g = (k) => q.get(k) || "";
@@ -50,7 +52,8 @@ export async function products({ store, q }) {
   ${field("rating_max", "Max rating", g("rating_max"))}${field("rank_max", "Rank at most", g("rank_max"))}${field("rank_min", "Rank at least", g("rank_min"))}
   ${field("units_min", "Min monthly units", g("units_min"))}${field("margin_min", "Min est. margin %", g("margin_min"))}
   ${sel("sort", "Sort by", [["score", "Opportunity score"], ["price", "Price"], ["bsr", "Rank"], ["reviews", "Reviews"], ["rating", "Rating"], ["monthly_units", "Monthly units"], ["title", "Title"]], g("sort") || "score")}</div>
-  <p style="margin:10px 0 0"><button>Apply</button> <a class="btn ghost" href="#/products">Reset</a></p></form>
+  <p style="margin:10px 0 0"><button>Apply</button> <a class="btn ghost" href="#/products">Reset</a> <button type="button" class="ghost" id="savesearch">Save this search</button></p></form>
+  ${saved.length ? h`<p class="sub">Saved searches: ${saved.map((x, i) => h`<a href="#/products${x.qs ? "?" + x.qs : ""}">${x.name}</a> <button class="link" data-rm="${i}" aria-label="Delete saved search ${x.name}">×</button> `)}</p>` : ""}
   ${!rows.length ? empty('No products match. <a href="#/import">Import a CSV</a> or loosen the filters.') : h`<p class="noprint"><button id="cmp">Compare selected</button> <span class="sub">tick up to 8 products</span></p>
   <div class="card wrap"><table><tr><th></th><th>Product</th><th>Market</th><th class="n">Price</th><th class="n">Rating</th><th class="n">Reviews</th><th class="n">Rank</th><th class="n">Units/mo</th><th class="n">Margin %</th><th class="n">Score</th></tr>
   ${rows.map((r) => h`<tr><td><input type="checkbox" class="pick" value="${r.p.id}" aria-label="Select ${r.p.asin}"></td><td><a href="#/products/${r.p.id}">${short(r.p.title || r.p.asin, 48)}</a><br><small class="chip">${r.p.asin}</small></td><td>${mpChip(r.p.marketplace)}</td>
@@ -59,12 +62,16 @@ export async function products({ store, q }) {
   <td class="n"><span class="score" title="${r.used} of ${r.total} factors had data">${r.score ?? "–"}</span></td></tr>`)}</table></div>`}`;
   return { html, after(root) {
     root.querySelector("#flt").addEventListener("submit", (e) => { e.preventDefault(); const d = formData(e.target), p = new URLSearchParams(); for (const [k, v] of Object.entries(d)) if (v !== "") p.set(k, v); location.hash = "#/products" + (p.toString() ? "?" + p : ""); });
+    root.querySelector("#savesearch").addEventListener("click", async () => { const name = (prompt("Name this search") || "").trim().slice(0, 40); if (!name) return; const qs = q.toString(); await store.setSetting("saved_searches", [...saved.filter((x) => x.name !== name), { name, qs }].slice(-20)); refresh(); });
+    root.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", async () => { await store.setSetting("saved_searches", saved.filter((_, i) => i !== Number(b.dataset.rm))); refresh(); }));
     const c = root.querySelector("#cmp"); if (c) c.addEventListener("click", () => { const ids = [...root.querySelectorAll(".pick:checked")].map((x) => x.value).slice(0, 8); location.hash = "#/compare?ids=" + ids.join(","); });
   } };
 }
 
-export async function product({ store, id, refresh }) {
+export async function product(ctx) {
+  const { store, id, refresh } = ctx;
   const p = store.get("products", id); if (!p) return { html: empty("Product not found.") };
+  const live = await liveCard(ctx, p);
   const lat = latest(store, id), [w, par] = scoring(store), sc = opportunity(scoreInputs(lat), w, par);
   const hist = Object.fromEntries(["price", "bsr", "reviews", "rating"].map((m) => [m, series(store, id, m)]));
   const inwl = store.t.watchlist_items.filter((i) => i.product_id === id).map((i) => i.watchlist_id);
@@ -76,10 +83,12 @@ export async function product({ store, id, refresh }) {
   ${sc.factors.map((f) => h`<div class="line"><span>${f.name.replace("_", " ")}<br><small>${f.detail}${f.score == null ? " (skipped)" : ""}</small></span><span>${f.score == null ? "–" : num(f.score)} <small>× ${num(f.weight)}</small></span></div><small class="sub">${EXPLAIN[f.name]}</small>`)}</div></div>
   <h3>History</h3><div class="grid g2">${[["price", "Price"], ["bsr", "Best Sellers Rank"], ["reviews", "Reviews"], ["rating", "Rating"]].map(([m, l]) => h`<div class="card"><b>${l}</b> ${hist[m].length > 1 ? spark(hist[m]) : ""}
   ${hist[m].length ? h`<table>${hist[m].slice(-6).map((x) => h`<tr><td>${x.as_of.slice(0, 10)}</td><td class="n">${num(x.value_num, m === "price" || m === "rating" ? 2 : 0)}</td><td>${kindChip(x.kind)}</td></tr>`)}</table>${hist[m].length < 2 ? h`<p class="sub">One snapshot so far. History grows with each import.</p>` : ""}` : h`<p class="sub">No data.</p>`}</div>`)}</div>
+  <h3>Live data</h3>${live.html}
   <h3>Actions</h3><div class="grid g2"><div class="card"><a class="btn" href="#/calculator?product=${id}">Open in profit calculator</a>
   <div style="margin-top:12px"><label>Add to watchlist</label><select id="wl">${store.t.watchlists.map((x) => h`<option value="${x.id}">${x.name}${inwl.includes(x.id) ? " (already in)" : ""}</option>`)}</select>${store.t.watchlists.length ? h`<p><button id="addwl">Add</button></p>` : h`<p class="sub">Create a watchlist first on the Watchlists page.</p>`}</div></div>
   <div class="card"><label>Add to research project</label><select id="pr">${store.t.projects.map((x) => h`<option value="${x.id}">${x.name}</option>`)}</select>${store.t.projects.length ? h`<p><button id="addpr">Add</button></p>` : h`<p class="sub">Create a project first on the Projects page.</p>`}</div></div>`;
   return { html, after(root) {
+    live.after(root);
     const a = root.querySelector("#addwl"); if (a) a.addEventListener("click", async () => { const w = root.querySelector("#wl").value; if (!store.t.watchlist_items.some((i) => i.watchlist_id === w && i.product_id === id)) await store.add("watchlist_items", { watchlist_id: w, product_id: id, added_at: now() }); refresh(); });
     const b = root.querySelector("#addpr"); if (b) b.addEventListener("click", async () => { const pj = root.querySelector("#pr").value; if (!store.t.project_items.some((i) => i.project_id === pj && i.product_id === id)) await store.add("project_items", { project_id: pj, product_id: id, note: "" }); refresh(); });
   } };
@@ -221,16 +230,17 @@ export async function alertsPage({ store, refresh }) {
 }
 
 /* ---------------- keywords, audit ---------------- */
-export async function keywords({ store, q }) {
-  const mp = q.get("marketplace") || "US", items = store.t.keywords.filter((k) => k.marketplace === mp).map((k) => {
+export async function keywords(ctx) {
+  const { store, q } = ctx;
+  const mp = q.get("marketplace") || "US", lookup = await keywordLookup(ctx, mp), items = store.t.keywords.filter((k) => k.marketplace === mp).map((k) => {
     const obs = store.t.keyword_observations.filter((o) => o.keyword_id === k.id && !o.asin), last = (m) => obs.filter((o) => o.metric === m).sort((a, b) => (a.as_of < b.as_of ? 1 : -1))[0];
     return { phrase: k.phrase, volume: (last("search_volume") || {}).value_num ?? null, competition: (last("competition") || {}).value_num ?? null, o: last("search_volume") || last("competition") };
   }).sort((a, b) => a.phrase.localeCompare(b.phrase));
   const clusters = clusterKeywords(items.map((i) => ({ phrase: i.phrase, volume: i.volume })));
-  return { html: h`<h2>Keywords</h2><p class="sub">Keyword numbers come from CSVs you import (for example Seller Central Brand Analytics, Helium 10 or a Google Keyword Planner export). <b>Reverse-ASIN and automatic rank tracking need a licensed data provider and are not connected</b>; see <a href="#/sources">Data sources</a>.</p>
-  <p><a class="btn ${mp === "US" ? "" : "ghost"}" href="#/keywords?marketplace=US">Amazon.com</a> <a class="btn ${mp === "CA" ? "" : "ghost"}" href="#/keywords?marketplace=CA">Amazon.ca</a> <a class="btn ghost" href="#/import">Import keywords</a></p>
+  return { html: h`<h2>Keywords</h2><p class="sub">Keyword numbers come from CSVs you import (for example Seller Central Brand Analytics, Helium 10 or a Google Keyword Planner export). <b>Search volume lookup and rank data are available only through a licensed provider you connect on your own server</b>; see <a href="#/sources">Data sources</a>.</p>
+  <p><a class="btn ${mp === "US" ? "" : "ghost"}" href="#/keywords?marketplace=US">Amazon.com</a> <a class="btn ${mp === "CA" ? "" : "ghost"}" href="#/keywords?marketplace=CA">Amazon.ca</a> <a class="btn ghost" href="#/import">Import keywords</a> <a class="btn ghost" href="#/ranks?marketplace=${mp}">Rank tracker</a></p>${lookup.html}
   ${!items.length ? empty("No keywords for this marketplace yet.") : h`<h3>Clusters</h3><p class="sub">Phrases grouped by shared stems. ${kindChip("calculated")}</p><div class="grid g2">${clusters.map((c) => h`<div class="card"><b>${c.label}</b> <span class="chip">${c.size} phrase${c.size !== 1 ? "s" : ""}</span>${c.total_volume != null ? h` <span class="chip">${num(c.total_volume)} searches</span>` : ""}<div class="sub">${c.members.map((m) => m.phrase).join(" · ")}</div></div>`)}</div>
-  <h3>All keywords</h3><div class="card wrap"><table><tr><th>Keyword</th><th class="n">Search volume</th><th class="n">Competition</th><th>Type</th><th>Source</th></tr>${items.map((k) => h`<tr><td>${k.phrase}</td><td class="n">${num(k.volume)}</td><td class="n">${num(k.competition)}</td><td>${k.o ? kindChip(k.o.kind) : ""}</td><td><small>${short(k.o && k.o.source, 40)}</small></td></tr>`)}</table></div>`}` };
+  <h3>All keywords</h3><div class="card wrap"><table><tr><th>Keyword</th><th class="n">Search volume</th><th class="n">Competition</th><th>Type</th><th>Source</th></tr>${items.map((k) => h`<tr><td>${k.phrase}</td><td class="n">${num(k.volume)}</td><td class="n">${num(k.competition)}</td><td>${k.o ? kindChip(k.o.kind) : ""}</td><td><small>${short(k.o && k.o.source, 40)}</small></td></tr>`)}</table></div>`}`, after: lookup.after };
 }
 export async function audit() {
   const html = h`<h2>Listing audit</h2><p class="sub">Rule-based checks of your draft against your keyword list. Limits are adjustable defaults, not Amazon facts: they vary by category, so confirm them in Seller Central's style guide. This tool does not write copy with AI.</p>
@@ -306,20 +316,24 @@ export async function project({ store, id, mode }) {
   const { cols, rows } = projectTable(store, id), calcs = store.t.calc_runs.filter((c) => c.project_id === id);
   return { html: h`<h2>${pr.name}</h2><p class="sub">${pr.notes || ""}</p><p><button id="csv">Download CSV</button> <button class="ghost" id="print">Print report</button></p>
   <div id="rep">${mode === "demo" ? h`<div class="notice warn">Contains FICTIONAL SAMPLE DATA.</div>` : ""}${!rows.length ? empty('No products yet. Open a product and use "Add to research project".') : h`<div class="card wrap"><table><tr>${cols.map((c) => h`<th>${c.replace(/_/g, " ")}</th>`)}</tr>${rows.map((r) => h`<tr>${cols.map((c) => h`<td>${r[c] ?? "–"}</td>`)}</tr>`)}</table></div>`}
+  ${snapshotHtml(snapshot(store, id))}
   <h3>Saved calculations</h3>${calcs.length ? calcs.map((c) => h`<div class="card" style="margin-bottom:8px"><b>${c.label || "Calculation"}</b> (${c.marketplace}, ${c.outputs.currency}): price ${money(c.outputs.sell_price, c.outputs.currency)}, profit ${money(c.outputs.profit, c.outputs.currency)} per unit, margin ${num(c.outputs.margin_pct, 1)}%, break-even ${money(c.outputs.break_even_price, c.outputs.currency)}.</div>`) : h`<p class="sub">None. Save one from the profit calculator and choose this project.</p>`}
   <p class="sub">A research aid, not a prediction. Estimated and user-supplied numbers can be wrong. Generated ${now()}.</p></div>`,
   after(root) { root.querySelector("#csv").addEventListener("click", () => download(`${pr.name.replace(/\W+/g, "-")}.csv`, toCSV(cols, rows))); root.querySelector("#print").addEventListener("click", () => window.print()); } };
 }
 
 /* ---------------- sources, settings ---------------- */
-export async function sources({ cloud, env }) {
+export async function sources(ctx) {
+  const { cloud, env } = ctx, st = await liveStatus(ctx);
   return { html: h`<h2>Data sources</h2><p class="sub">What each source can and cannot provide, what it needs and what it costs. This app never invents numbers a source cannot supply.</p>
   <div class="grid g2">${providers(cloud).map((p) => h`<div class="card"><b>${p.name}</b> <span class="chip ${p.status === "ready" || p.status === "connected" ? "observed" : ""}">${p.status}</span>
   <h3>Can provide</h3><ul>${p.gives.length ? p.gives.map((g) => h`<li>${g}</li>`) : h`<li>–</li>`}</ul><h3>Cannot provide</h3><ul>${p.not.map((g) => h`<li>${g}</li>`)}</ul>
   <div class="line"><span>Needs</span><span>${p.needs}</span></div><div class="line"><span>Cost</span><span>${p.cost}</span></div><p class="sub"><b>What was verified:</b> ${p.verified}</p>${(p.notes || []).map((n) => h`<p class="sub">${n}</p>`)}${p.docs ? h`<a href="${p.docs}" target="_blank" rel="noopener">Official docs</a>` : ""}</div>`)}</div>
+  <h3>Live integrations on your server</h3><div class="card">${st.available ? ["spapi", "keepa", "dataforseo"].map((k) => h`<div class="line"><span>${({ spapi: "Amazon SP-API", keepa: "Keepa", dataforseo: "DataForSEO" })[k]}</span><span class="${st[k] ? "pill-ok" : "pill-warn"}">${st[k] ? "secrets set: working only if the account is valid" : "not configured"}</span></div>`) : h`<p>${st.why}</p>`}<p class="sub">"Secrets set" means the server has the credentials; it does not prove they are valid. The first fetch shows the provider's real answer. Until then the app shows only your uploads (and sample data in demo mode).</p></div>
   <h3>Where your data is stored</h3><div class="card"><p>${env}</p></div>` };
 }
-export async function settings({ store, mode, cloud, refresh, migrate, exportAll, importAll }) {
+export async function settings(ctx) {
+  const { store, mode, cloud, refresh, migrate, exportAll, importAll } = ctx, sec = await securityCard(ctx);
   const fx = fxRates(store), [w, p] = scoring(store);
   const html = h`<h2>Settings</h2><h3>Exchange rates</h3><form class="card" id="fx" style="max-width:520px"><p class="sub">Entered by you; the app never fetches or guesses rates. ${fx.updated_at ? "Last saved " + fx.updated_at.slice(0, 16) + "." : ""}</p>
   <label>1 USD in CAD</label><input type="number" step="any" min="0" name="usd_cad" value="${fx.USD_CAD ?? ""}"><label>1 CNY in USD (optional, for suppliers priced in yuan)</label><input type="number" step="any" min="0" name="cny_usd" value="${fx.CNY_USD ?? ""}"><p><button>Save rates</button></p></form>
@@ -329,7 +343,7 @@ export async function settings({ store, mode, cloud, refresh, migrate, exportAll
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="verified" style="width:auto" ${raw(pr.verified_at ? "checked" : "")}> I checked these against Seller Central</label><p><button>Save ${mp} profile</button></p></form>`; })}</div>
   <h3>Opportunity score</h3><form class="card" id="sc"><p class="sub">Weights (relative importance) and the numbers each factor uses. Missing data is skipped and the weights are renormalised.</p><div class="row">${Object.entries(DEFAULT_WEIGHTS).map(([k]) => field(`w_${k}`, "weight: " + k.replace("_", " "), w[k] ?? DEFAULT_WEIGHTS[k]))}</div><div class="row">${Object.entries(DEFAULT_PARAMS).map(([k]) => field(`p_${k}`, k.replace(/_/g, " "), p[k] ?? DEFAULT_PARAMS[k]))}</div><p><button>Save scoring</button></p></form>
   <h3>Your data</h3><div class="card"><p class="sub">Storage: <b>${cloud ? "your account (synced)" : mode === "demo" ? "demo (not saved)" : "this device only"}</b>.</p><p><button id="exp" class="ghost">Download a backup (JSON)</button> <label class="btn ghost" style="display:inline-block;margin:0">Restore a backup<input type="file" id="imp" accept=".json" hidden></label>
-  ${cloud ? h` <button id="mig" class="ghost">Copy this device's data into my account</button>` : ""}</p><div id="dmsg" class="pill-ok"></div></div>`;
+  ${cloud ? h` <button id="mig" class="ghost">Copy this device's data into my account</button>` : ""}</p><div id="dmsg" class="pill-ok"></div></div>${sec}`;
   return { html, after(root) {
     root.querySelector("#fx").addEventListener("submit", async (e) => { e.preventDefault(); const d = formData(e.target), a = fnum(d.usd_cad), b = fnum(d.cny_usd); if ((a != null && a <= 0) || (b != null && b <= 0)) return; await store.setSetting("fx", { USD_CAD: a, CNY_USD: b, updated_at: now(), source: "entered by you" }); refresh(); });
     root.querySelectorAll(".prof").forEach((f) => f.addEventListener("submit", async (e) => { e.preventDefault(); const d = formData(f), data = {}; for (const k of Object.keys(feeProfile(store, f.dataset.mp).data)) data[k] = fnum(d[k], 0); await saveFeeProfile(store, f.dataset.mp, data, d.verified === "on", (d.source_note || "").slice(0, 300)); refresh(); }));

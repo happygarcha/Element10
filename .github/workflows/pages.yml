@@ -2,7 +2,7 @@ name: pages
 # Publishes the Element10 web app (folder web/) to GitHub Pages. Needs: repo public (free plan) and
 # Settings -> Pages -> Source = "GitHub Actions". Tests run first; a failing test blocks the deploy.
 on:
-  push: { branches: [main], paths: ["web/**"] }
+  push: { branches: [main], paths: ["web/**", "tests/functions.test.js", "supabase/functions/**"] }
   workflow_dispatch: {}
 permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: true }
@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - run: node --test web/tests/calc.test.js web/tests/data.test.js
+      - run: node --test web/tests/*.test.js tests/functions.test.js
       - run: rm -rf web/tests
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }

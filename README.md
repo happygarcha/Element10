@@ -33,7 +33,7 @@ Data lives in `data/live.db` and `data/demo.db` (SQLite). Back up by copying the
 
 ## Docs
 [research and sources](docs/01-research-and-sources.md) · [feature matrix](docs/02-feature-matrix.md) · [architecture](docs/03-architecture.md) ·
-[data integrity](docs/04-data-integrity.md) · [calculations](docs/05-calculations.md) · [hosting and login](docs/06-hosting-and-login.md) · [phase 2](docs/07-phase2.md)
+[data integrity](docs/04-data-integrity.md) · [calculations](docs/05-calculations.md) · [hosting and login](docs/06-hosting-and-login.md) · [phase 2](docs/07-phase2.md) · [REA investigation](docs/08-rea-investigation.md) · [providers and MCP](docs/09-providers-and-mcp.md)
 
 ## Web edition tests
 ```bash

@@ -73,12 +73,17 @@ create table if not exists public.ad_terms (
   clicks double precision, spend double precision, sales double precision, orders double precision,
   as_of timestamptz, source text, kind text);
 
+create table if not exists public.suppliers (
+  id uuid primary key, user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null, name text not null, contact text, quote_unit_cost double precision,
+  currency text, moq double precision, lead_days double precision, quoted_at timestamptz, notes text);
+
 -- Row-level security: a login can only read and write its own rows. Nothing is readable without logging in.
 do $$
 declare t text;
 begin
   foreach t in array array['imports','products','observations','watchlists','watchlist_items','alert_rules','alerts','keywords',
-                           'keyword_observations','fee_profiles','settings','projects','project_items','calc_runs','ad_terms']
+                           'keyword_observations','fee_profiles','settings','projects','project_items','calc_runs','ad_terms','suppliers']
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "own rows" on public.%I', t);

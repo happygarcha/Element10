@@ -16,4 +16,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - run: node --test web/tests/calc.test.js web/tests/data.test.js
+      - run: node --test web/tests/*.test.js tests/functions.test.js

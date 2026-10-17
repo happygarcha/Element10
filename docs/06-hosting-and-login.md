@@ -46,3 +46,22 @@ Supabase free tier and GitHub Pages are free. Supabase free projects pause after
 ## Other editions
 The Python edition (`src/arp`, run with `python -m arp`) keeps data in a local SQLite file and is the place for server-side secrets (e.g. Amazon SP-API credentials),
 which a browser-only site cannot keep private.
+
+## Live data functions (optional; each provider costs money or needs a seller account)
+Skip this section if you only use CSV imports. Nothing here is required for login, storage or the calculators.
+
+1. Install the Supabase CLI and log in: `npm i -g supabase` then `supabase login`.
+2. From the repo root: `supabase link --project-ref <your-project-ref>`.
+3. Set the secrets for providers you actually subscribed to (never commit these):
+   ```
+   supabase secrets set ALLOWED_ORIGINS=https://<your-github-name>.github.io
+   supabase secrets set ALLOWED_EMAILS=<your login email>
+   supabase secrets set KEEPA_API_KEY=...                       # Keepa
+   supabase secrets set DATAFORSEO_LOGIN=... DATAFORSEO_PASSWORD=...   # DataForSEO
+   supabase secrets set SPAPI_LWA_CLIENT_ID=... SPAPI_LWA_CLIENT_SECRET=... SPAPI_REFRESH_TOKEN=...   # SP-API
+   ```
+   (`SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided to functions automatically.)
+4. Deploy: `supabase functions deploy status spapi keepa dataforseo`.
+5. Open Element10 -> Data sources: each provider shows "secrets set". Then use the Fetch buttons on a product page.
+6. Run `supabase/tests/rls_check.sql` in the SQL editor: every row should show `ok = true`.
+The functions verify your login with Supabase, only answer `ALLOWED_EMAILS`, cap request sizes and call rates, and never return a secret.
