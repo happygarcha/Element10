@@ -46,7 +46,7 @@ MAX_UPLOAD = 2_000_000
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    app = FastAPI(title="Amazon research workbench", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Element10", docs_url=None, redoc_url=None)
     app.state.settings = settings
     app.state.conns = {}
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")

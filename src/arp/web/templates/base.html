@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="csrf" content="{{ csrf }}">
-<title>{% block title %}Amazon Research{% endblock %}</title>
+<title>{% block title %}Element10{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 {% import 'macros.html' as m %}
 <div class="shell">
 <nav class="side" aria-label="Main">
-  <h1>Amazon research</h1>
+  <h1>Element10</h1>
   {% for href, label in [('/', 'Dashboard'), ('/products', 'Products'), ('/import', 'Import CSV'), ('/calculator', 'Profit calculator'), ('/watchlists', 'Watchlists'), ('/alerts', 'Alerts'), ('/keywords', 'Keywords'), ('/listing-audit', 'Listing audit'), ('/projects', 'Projects & reports'), ('/sources', 'Data sources'), ('/settings', 'Settings')] %}
   <a href="{{ href }}" class="{{ 'on' if (nav == href or (href != '/' and nav.startswith(href))) else '' }}">{{ label }}</a>
   {% endfor %}

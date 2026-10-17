@@ -1,6 +1,6 @@
-# Amazon research workbench
+# Element10
 
-A private research tool for Amazon FBA opportunities on **Amazon.ca and Amazon.com**. Original code, benchmarked against the
+Element10 is a private research tool for Amazon FBA opportunities on **Amazon.ca and Amazon.com**. Original code, benchmarked against the
 publicly documented features of tools like Helium 10. It does not scrape Amazon, copy anyone's software, or use private endpoints.
 
 **Free to run, no accounts needed.** Without credentials it works on CSV exports you provide. Official Amazon data (SP-API) needs your
