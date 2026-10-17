@@ -19,3 +19,7 @@ export function fnum(v, dflt = null) {
   const n = Number(String(v).replace(/,/g, ""));
   return Number.isFinite(n) ? n : dflt;
 }
+// Plain links to Amazon's own pages (opened in a new tab). Nothing is fetched or scraped.
+const HOST = { CA: "www.amazon.ca", US: "www.amazon.com" };
+export const amazonUrl = (mp, asin) => (HOST[mp] && /^[A-Z0-9]{10}$/.test(asin || "") ? `https://${HOST[mp]}/dp/${asin}` : null);
+export const amazonSearchUrl = (mp, phrase) => (HOST[mp] && phrase ? `https://${HOST[mp]}/s?k=${encodeURIComponent(phrase)}` : null);

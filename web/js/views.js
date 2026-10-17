@@ -10,7 +10,7 @@ import { providers } from "./providers.js";
 import { feeProfile, fxFor, fxRates, latest, productRows, saveCalc, saveFeeProfile, scoreInputs, scoring, series } from "./services.js";
 import { TABLES } from "./store.js";
 import { download, h, kindChip, mpChip, raw, spark, toCSV } from "./ui.js";
-import { CURRENCY, fnum, money, now, num } from "./util.js";
+import { CURRENCY, amazonSearchUrl, amazonUrl, fnum, money, now, num } from "./util.js";
 import { keywordLookup, liveCard, liveStatus, securityCard, snapshot, snapshotHtml } from "./views2.js";
 
 const cell = (lat, key, d = 0) => { const o = lat[key]; return o && o.value_num != null ? h`<span title="${o.kind.replace("_", " ")} · ${o.source} · ${(o.as_of || "").slice(0, 10)}">${num(o.value_num, d)}</span>` : raw("–"); };
@@ -81,7 +81,7 @@ export async function product(ctx) {
   const hist = Object.fromEntries(["price", "bsr", "reviews", "rating"].map((m) => [m, series(store, id, m)]));
   const inwl = store.t.watchlist_items.filter((i) => i.product_id === id).map((i) => i.watchlist_id);
   const dec = (k) => (["price", "rating", "est_margin_pct", "fba_fee", "referral_fee"].includes(k) ? 2 : 0);
-  const html = h`<h2>${p.title || p.asin}</h2><p class="sub">${mpChip(p.marketplace)} <span class="chip">${p.asin}</span> ${p.brand || ""} ${p.category ? "· " + p.category : ""}</p>
+  const html = h`<h2>${p.title || p.asin}</h2><p class="sub">${mpChip(p.marketplace)} <span class="chip">${p.asin}</span> <a href="${amazonUrl(p.marketplace, p.asin)}" target="_blank" rel="noopener noreferrer">View on Amazon.${p.marketplace === "CA" ? "ca" : "com"} ↗</a> ${p.brand || ""} ${p.category ? "· " + p.category : ""}</p>
   <div class="grid g2"><div class="card"><h3 style="margin-top:0">Latest numbers</h3><table><tr><th>Metric</th><th class="n">Value</th><th>Type</th><th>Source</th><th>As of</th></tr>
   ${Object.entries(lat).map(([k, o]) => h`<tr><td>${k.replace(/_/g, " ")}</td><td class="n">${num(o.value_num, dec(k))}</td><td>${kindChip(o.kind)}</td><td><small>${short(o.source, 110)}</small></td><td><small>${o.as_of.slice(0, 10)}</small></td></tr>`)}</table>${Object.keys(lat).length ? "" : h`<p class="sub">No numbers yet for this product.</p>`}</div>
   <div class="card"><h3 style="margin-top:0">Opportunity score: <span class="score">${sc.score ?? "–"}</span></h3><p class="sub">Built from ${sc.used} of ${sc.total} factors that have data. ${kindChip("calculated")}</p>
@@ -245,7 +245,7 @@ export async function keywords(ctx) {
   return { html: h`<h2>Keywords</h2><p class="sub">Keyword numbers come from CSVs you import (for example Seller Central Brand Analytics, Helium 10 or a Google Keyword Planner export). <b>Search volume lookup and rank data are available only through a licensed provider you connect on your own server</b>; see <a href="#/sources">Data sources</a>.</p>
   <p><a class="btn ${mp === "US" ? "" : "ghost"}" href="#/keywords?marketplace=US">Amazon.com</a> <a class="btn ${mp === "CA" ? "" : "ghost"}" href="#/keywords?marketplace=CA">Amazon.ca</a> <a class="btn ghost" href="#/import">Import keywords</a> <a class="btn ghost" href="#/ranks?marketplace=${mp}">Rank tracker</a></p>${lookup.html}
   ${!items.length ? empty("No keywords for this marketplace yet.") : h`<h3>Clusters</h3><p class="sub">Phrases grouped by shared stems. ${kindChip("calculated")}</p><div class="grid g2">${clusters.map((c) => h`<div class="card"><b>${c.label}</b> <span class="chip">${c.size} phrase${c.size !== 1 ? "s" : ""}</span>${c.total_volume != null ? h` <span class="chip">${num(c.total_volume)} searches</span>` : ""}<div class="sub">${c.members.map((m) => m.phrase).join(" · ")}</div></div>`)}</div>
-  <h3>All keywords</h3><div class="card wrap"><table><tr><th>Keyword</th><th class="n">Search volume</th><th class="n">Competition</th><th>Type</th><th>Source</th></tr>${items.map((k) => h`<tr><td>${k.phrase}</td><td class="n">${num(k.volume)}</td><td class="n">${num(k.competition)}</td><td>${k.o ? kindChip(k.o.kind) : ""}</td><td><small>${short(k.o && k.o.source, 40)}</small></td></tr>`)}</table></div>`}`, after: lookup.after };
+  <h3>All keywords</h3><div class="card wrap"><table><tr><th>Keyword</th><th class="n">Search volume</th><th class="n">Competition</th><th>Type</th><th>Source</th></tr>${items.map((k) => h`<tr><td>${k.phrase} <a href="${amazonSearchUrl(mp, k.phrase)}" target="_blank" rel="noopener noreferrer" aria-label="Search Amazon for ${k.phrase}">↗</a></td><td class="n">${num(k.volume)}</td><td class="n">${num(k.competition)}</td><td>${k.o ? kindChip(k.o.kind) : ""}</td><td><small>${short(k.o && k.o.source, 40)}</small></td></tr>`)}</table></div>`}`, after: lookup.after };
 }
 export async function audit() {
   const html = h`<h2>Listing audit</h2><p class="sub">Rule-based checks of your draft against your keyword list. Limits are adjustable defaults, not Amazon facts: they vary by category, so confirm them in Seller Central's style guide. This tool does not write copy with AI.</p>
