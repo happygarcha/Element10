@@ -7,7 +7,7 @@ nodefs.mkdirSync("/tmp/pw", { recursive: true });
 import fs from "node:fs";
 const base = "http://127.0.0.1:8772/index.html"; const res = []; const ok = (n, c, x = "") => res.push([c ? "PASS" : "FAIL", n, x]);
 const b = await launchBrowser();
-const ctx = await b.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
+const ctx = await b.newContext({ viewport: { width: 390, height: 800 }, ...(process.env.BROWSER === "firefox" ? {} : { hasTouch: true, isMobile: true }) });
 const p = await ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(e.message)); p.on("dialog", (d) => d.accept()); p.on("console", (m) => { if (m.type() === "error" && !/404|favicon/.test(m.text())) errs.push(m.text()); });
 await p.goto(base); await p.waitForSelector("#lf");
 await p.fill("input[name=email]", "me@example.com"); await p.fill("input[name=password]", "correct-horse"); await p.click("button[data-act=in]"); await p.waitForSelector(".topbar");
