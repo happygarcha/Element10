@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block title %}Compare{% endblock %}{% block body %}
+<h2>Compare products</h2>
+{% if not items %}<div class="empty">Pick products on the <a href="/products">Products</a> page, tick the boxes and press Compare.</div>{% else %}
+<p class="sub">Side by side. Each value shows its source on hover. Different marketplaces use different currencies and category ranks.</p>
+<div class="card wrap"><table><tr><th></th>{% for it in items %}<th><a href="/products/{{ it.p.id }}">{{ it.p.title|short(30) or it.p.asin }}</a><br>{{ m.mp(it.p.marketplace) }} <span class="chip">{{ it.p.asin }}</span></th>{% endfor %}</tr>
+<tr><td><b>Opportunity score</b></td>{% for it in items %}<td><span class="score">{{ it.sc.score if it.sc.score is not none else '–' }}</span><br><small>{{ it.sc.used }}/{{ it.sc.total }} factors</small></td>{% endfor %}</tr>
+{% for key, label in rows %}<tr><td>{{ label }}</td>{% for it in items %}<td>{{ m.cell(it.lat, key, 2 if key in ('price','rating','est_margin_pct','fba_fee','referral_fee') else 0) }}{% if it.lat.get(key) %}<br>{{ m.kind(it.lat[key].kind) }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+<tr><td>Category</td>{% for it in items %}<td>{{ it.p.category or '–' }}</td>{% endfor %}</tr>
+<tr><td>Calculator</td>{% for it in items %}<td><a href="/calculator?product={{ it.p.id }}">Open</a></td>{% endfor %}</tr></table></div>
+{% endif %}{% endblock %}

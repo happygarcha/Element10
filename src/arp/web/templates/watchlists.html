@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}Watchlists{% endblock %}{% block body %}
+<h2>Watchlists</h2><p class="sub">Alerts fire only when new numbers arrive (a new import or API refresh). There is no background monitoring of Amazon.</p>
+<form class="card" method="post" action="/watchlists" style="max-width:420px">{{ m.csrf_field() }}<label>New watchlist</label><input type="text" name="name" required maxlength="80"><p><button>Create</button></p></form>
+{% for wl in wls %}<h3>{{ wl.w.name }}</h3><div class="card">
+{% if wl['items'] %}<div class="wrap"><table><tr><th>Product</th><th>Market</th><th class="n">Price</th><th class="n">Rank</th><th>Price history</th><th></th></tr>
+{% for it in wl['items'] %}<tr><td><a href="/products/{{ it.id }}">{{ it.title|short(40) or it.asin }}</a></td><td>{{ m.mp(it.marketplace) }}</td><td class="n">{{ m.cell(it.lat,'price',2) }}</td><td class="n">{{ m.cell(it.lat,'bsr') }}</td>
+<td>{% if it.price_hist|length > 1 %}{{ spark(it.price_hist) }}{% else %}<small>one snapshot</small>{% endif %}</td>
+<td><form class="inline" method="post" action="/watchlists/{{ wl.w.id }}/remove/{{ it.id }}">{{ m.csrf_field() }}<button class="link">remove</button></form></td></tr>{% endfor %}</table></div>
+{% else %}<div class="empty">Empty. Open a product and use "Add to watchlist".</div>{% endif %}
+<h3>Alert rules</h3>{% for r in wl.rules %}<div class="line"><span>{{ r.metric }} {{ ops[r.op] }} {{ r.threshold|num(2) }}</span></div>{% else %}<p class="sub">No rules yet.</p>{% endfor %}
+<form method="post" action="/watchlists/{{ wl.w.id }}/rule" class="row" style="margin-top:8px">{{ m.csrf_field() }}
+<div><label>Metric</label><select name="metric">{% for k in ['price','bsr','reviews','rating','seller_count','monthly_units'] %}<option>{{ k }}</option>{% endfor %}</select></div>
+<div><label>When it</label><select name="op">{% for k, v in ops.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div><label>Value</label><input type="number" step="any" name="threshold" required></div><div><label>&nbsp;</label><button>Add rule</button></div></form></div>{% endfor %}
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block title %}Data sources{% endblock %}{% block body %}
+<h2>Data sources</h2><p class="sub">What each source can and cannot provide, what it needs and what it costs. This app never invents numbers a source cannot supply.</p>
+<div class="grid g2">{% for p in providers %}<div class="card"><b>{{ p.name }}</b> <span class="chip {{ 'observed' if p.status=='ready' else '' }}">{{ p.status }}</span>
+<h3>Can provide</h3><ul>{% for g in p.gives %}<li>{{ g }}</li>{% else %}<li>–</li>{% endfor %}</ul>
+<h3>Cannot provide</h3><ul>{% for g in p.does_not_give %}<li>{{ g }}</li>{% endfor %}</ul>
+<div class="line"><span>Needs</span><span>{{ p.requires }}</span></div><div class="line"><span>Cost</span><span>{{ p.cost }}</span></div>
+<p class="sub"><b>What was verified:</b> {{ p.verified }}</p>{% for n in p.notes %}<p class="sub">{{ n }}</p>{% endfor %}{% if p.docs %}<a href="{{ p.docs }}" target="_blank" rel="noopener">Official docs</a>{% endif %}</div>{% endfor %}</div>
+<h3>Server configuration</h3><div class="card"><p class="sub">Secrets are read from the server's environment and are never sent to the browser or written to logs.</p>{% for k, v in env.items() %}<div class="line"><span>{{ k }}</span><span>{{ v }}</span></div>{% endfor %}</div>{% endblock %}

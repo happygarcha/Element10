@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block title %}{{ pr.name }}{% endblock %}{% block body %}
+<h2>{{ pr.name }}</h2><p class="sub">{{ pr.notes or '' }}</p>
+<p><a class="btn" href="/projects/{{ pr.id }}/report.csv">Download CSV</a> <a class="btn ghost" href="/projects/{{ pr.id }}/report" target="_blank">Printable report</a></p>
+{% if not rows %}<div class="empty">No products yet. Open a product and use "Add to research project".</div>{% else %}
+<div class="card wrap"><table><tr>{% for c in cols %}<th>{{ c.replace('_',' ') }}</th>{% endfor %}</tr>{% for r in rows %}<tr>{% for c in cols %}<td>{{ r[c] if r[c] is not none else '–' }}</td>{% endfor %}</tr>{% endfor %}</table></div>{% endif %}
+<h3>Saved calculations</h3>{% for c in calcs %}<div class="line"><span>#{{ c.id }} {{ c.label or '' }} <span class="chip mp">{{ c.marketplace }}</span></span><small>{{ c.created_at[:16] }}</small></div>{% else %}<p class="sub">None. Save one from the profit calculator and choose this project.</p>{% endfor %}{% endblock %}

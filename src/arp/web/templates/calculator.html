@@ -1,0 +1,32 @@
+{% extends 'base.html' %}{% block title %}Profit calculator{% endblock %}{% block body %}
+{% macro fld(name, label, step='any') %}<div><label>{{ label }}</label><input type="number" step="{{ step }}" min="0" name="{{ name }}" value="{{ vals.get(name, '') }}"></div>{% endmacro %}
+<h2>Profit calculator</h2>
+<p class="sub">Per unit, Amazon FBA. Amazon.ca in CAD and Amazon.com in USD, each with its own fee profile. {{ m.kind('calculated') }} Nothing is estimated for you: fees come from your fee profile, which you confirm against Seller Central.</p>
+{% if prod %}<div class="notice">Loaded from <a href="/products/{{ prod.id }}">{{ prod.title or prod.asin }}</a>. Price and FBA fee are the latest values stored for it.</div>{% endif %}
+{% if not prof.verified_at %}<div class="notice warn">The {{ mp }} fee profile is unverified starter values (referral rate and minimum are common defaults; FBA, storage and return fees start at zero). Enter the real figures from Seller Central's FBA Revenue Calculator and mark the profile verified in <a href="/settings">Settings</a>.</div>{% endif %}
+{% if not fx.get('USD_CAD') %}<div class="notice warn">No USD→CAD rate set. Costs in USD cannot be converted to CAD until you add one in <a href="/settings">Settings</a>.</div>{% endif %}
+<div class="grid g2" style="align-items:start">
+<form class="card" id="calc" method="post" action="/calculator/save">{{ m.csrf_field() }}
+<input type="hidden" name="product_id" value="{{ prod.id if prod else '' }}">
+<div class="row"><div><label>Marketplace</label><select name="marketplace"><option value="CA" {{ 'selected' if mp=='CA' }}>Amazon.ca (CAD)</option><option value="US" {{ 'selected' if mp=='US' }}>Amazon.com (USD)</option></select></div>
+{{ fld('sell_price', 'Selling price') }}</div>
+<h3>Cost of goods</h3><div class="row">{{ fld('supplier_cost', 'Supplier cost per unit') }}
+<div><label>Supplier currency</label><select name="supplier_currency">{% for c in ['USD','CAD','CNY'] %}<option {{ 'selected' if vals.get('supplier_currency','USD')==c }}>{{ c }}</option>{% endfor %}</select></div>
+{{ fld('freight_per_unit', 'Freight per unit') }}
+<div><label>Freight currency</label><select name="freight_currency">{% for c in ['USD','CAD','CNY'] %}<option {{ 'selected' if vals.get('freight_currency','USD')==c }}>{{ c }}</option>{% endfor %}</select></div>
+{{ fld('duties_pct', 'Duties %') }}
+<div><label>Duties charged on</label><select name="duties_base"><option value="cost_only" {{ 'selected' if vals.get('duties_base')!='cost_plus_freight' }}>Supplier cost</option><option value="cost_plus_freight" {{ 'selected' if vals.get('duties_base')=='cost_plus_freight' }}>Cost + freight</option></select></div>
+{{ fld('other_landed_per_unit', 'Other landed cost (marketplace currency)') }}</div>
+<h3>Amazon fees</h3><div class="row">{{ fld('referral_pct', 'Referral fee %') }}{{ fld('referral_min', 'Referral minimum') }}{{ fld('fba_fee', 'FBA fulfilment fee') }}{{ fld('other_amazon_fees', 'Other Amazon fees') }}
+{{ fld('storage_rate_per_cuft_month', 'Storage per cu ft per month') }}{{ fld('cubic_ft', 'Cubic feet per unit') }}{{ fld('months_in_storage', 'Months in storage') }}</div>
+<h3>Advertising</h3><div class="row"><div><label>Advertising by</label><select name="ad_mode"><option value="acos" {{ 'selected' if vals.get('ad_mode')!='per_unit' }}>% of price (ACoS)</option><option value="per_unit" {{ 'selected' if vals.get('ad_mode')=='per_unit' }}>Fixed per unit</option></select></div>{{ fld('acos_pct', 'ACoS %') }}{{ fld('ad_per_unit', 'Ad cost per unit') }}</div>
+<h3>Returns</h3><div class="row">{{ fld('return_rate_pct', 'Return rate %') }}{{ fld('resellable_pct', 'Returns resellable %') }}{{ fld('return_processing_fee', 'Return processing fee') }}{{ fld('refund_admin_fee', 'Refund admin fee') }}
+<div><label>Fulfilment fee lost on returns</label><select name="lose_fba_fee_on_return"><option value="1" {{ 'selected' if vals.get('lose_fba_fee_on_return','1') not in ('0','false') }}>Yes</option><option value="0" {{ 'selected' if vals.get('lose_fba_fee_on_return') in ('0','false') }}>No</option></select></div></div>
+<h3><label style="display:inline"><input type="checkbox" id="both" name="both" value="1" style="width:auto"> Also calculate {{ 'Amazon.com' if mp=='CA' else 'Amazon.ca' }}</label></h3>
+<div class="row">{{ fld('s_sell_price', 'Price on ' ~ ('Amazon.com (USD)' if mp=='CA' else 'Amazon.ca (CAD)')) }}{{ fld('s_fba_fee', 'FBA fee there') }}{{ fld('s_referral_pct', 'Referral % there') }}{{ fld('s_referral_min', 'Referral minimum there') }}</div>
+<p class="sub">Blank fields on the second marketplace use its fee profile. Supplier cost and freight are shared.</p>
+<h3>Save</h3><div class="row"><div><label>Label</label><input type="text" name="label"></div><div><label>Project</label><select name="project_id"><option value="">(none)</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div></div>
+<p><button type="submit">Save this calculation{{ ' to the product' if prod }}</button></p></form>
+<div><div class="card" id="res1">Enter a price and costs.</div><div class="card" id="res2" style="margin-top:12px"></div>
+<h3>Recent saved</h3>{% for r in runs %}<div class="line"><span>#{{ r.id }} {{ r.label or '' }} <span class="chip mp">{{ r.marketplace }}</span></span><small>{{ r.created_at[:16] }}</small></div>{% else %}<p class="sub">None.</p>{% endfor %}</div>
+</div>{% endblock %}

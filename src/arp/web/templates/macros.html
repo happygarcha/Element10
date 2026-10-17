@@ -1,0 +1,4 @@
+{% macro kind(k) %}<span class="chip {{ k }}" title="{{ KIND_HELP.get(k, '') }}">{{ k.replace('_', ' ') }}</span>{% endmacro %}
+{% macro csrf_field() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
+{% macro cell(lat, key, d=0, cur='') %}{% set o = lat.get(key) %}{% if o and o.value_num is not none %}<span title="{{ o.kind.replace('_',' ') }} · {{ o.source }} · {{ o.as_of[:10] }}">{{ cur }}{{ o.value_num|num(d) }}</span>{% else %}–{% endif %}{% endmacro %}
+{% macro mp(m) %}<span class="chip mp">{{ m }}</span>{% endmacro %}

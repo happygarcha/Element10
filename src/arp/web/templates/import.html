@@ -1,0 +1,26 @@
+{% extends 'base.html' %}{% block title %}Import{% endblock %}{% block body %}
+<h2>Import CSV</h2>
+{% if step == 'upload' %}
+<p class="sub">Upload a report you exported yourself (Seller Central, Helium 10, Jungle Scout, Keepa, a spreadsheet). Imported numbers are always labelled <i>user supplied</i> with the label you give them.</p>
+<form class="card" method="post" action="/import/preview" enctype="multipart/form-data" style="max-width:640px">{{ m.csrf_field() }}
+<label>What is in the file?</label><select name="kind"><option value="products">Products (one row per ASIN)</option><option value="keywords">Keywords (one row per phrase)</option></select>
+<label>Marketplace the numbers are for</label><select name="marketplace"><option value="CA">Amazon.ca (CAD)</option><option value="US">Amazon.com (USD)</option></select>
+<label>Source label (shown next to every number)</label><input type="text" name="source_label" required placeholder="e.g. Helium 10 Xray export, 17 Oct 2026">
+<label>Data date (when the numbers were captured; blank = today)</label><input type="date" name="as_of">
+<label>CSV file (up to 2 MB)</label><input type="file" name="file" accept=".csv,.tsv,text/csv" required>
+<p><button>Preview columns</button></p></form>
+<h3>Recent imports</h3>
+{% if imps %}<div class="card wrap"><table><tr><th>When</th><th>File</th><th>Type</th><th>Market</th><th>Label</th><th class="n">Rows</th></tr>{% for i in imps %}<tr><td>{{ i.uploaded_at[:16] }}</td><td>{{ i.filename }}</td><td>{{ i.kind }}</td><td>{{ i.marketplace }}</td><td>{{ i.source_label|short(40) }}</td><td class="n">{{ i.rows_ok }}{% if i.rows_skipped %} (+{{ i.rows_skipped }} skipped){% endif %}</td></tr>{% endfor %}</table></div>{% else %}<p class="sub">None yet.</p>{% endif %}
+{% elif step == 'map' %}
+<p class="sub">{{ preview.total }} rows found. Check how the columns were matched, fix any that are wrong, then import.</p>
+<form class="card" method="post" action="/import/commit">{{ m.csrf_field() }}
+{% for k in ['kind','marketplace','source_label','as_of','filename'] %}<input type="hidden" name="{{ k }}" value="{{ preview[k] }}">{% endfor %}
+<textarea name="text" hidden>{{ preview.text }}</textarea>
+<div class="row">{% for f in preview.aliases %}<div><label>{{ f.replace('_',' ') }}</label><select name="map_{{ f }}"><option value="">(not in file)</option>{% for h in preview.headers %}<option {{ 'selected' if preview.mapping.get(f) == h }}>{{ h }}</option>{% endfor %}</select></div>{% endfor %}</div>
+<h3>First rows</h3><div class="wrap"><table><tr>{% for h in preview.headers %}<th>{{ h }}</th>{% endfor %}</tr>{% for r in preview.rows %}<tr>{% for h in preview.headers %}<td>{{ r.get(h,'')|short(40) }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+<p><button>Import {{ preview.total }} rows as {{ 'sample' if mode == 'demo' else 'user supplied' }}</button> <a class="btn ghost" href="/import">Cancel</a></p></form>
+{% else %}
+<div class="notice">Imported <b>{{ preview.res.ok }}</b> rows{% if preview.res.skipped %}, skipped <b>{{ preview.res.skipped }}</b>{% endif %}.{% if preview.alerts %} <b>{{ preview.alerts }}</b> new alert(s): <a href="/alerts">view</a>.{% endif %}</div>
+{% if preview.res.problems %}<div class="card"><b>Notes</b><ul>{% for p in preview.res.problems[:25] %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+<p><a class="btn" href="{{ '/products' if preview.kind == 'products' else '/keywords' }}">View {{ preview.kind }}</a> <a class="btn ghost" href="/import">Import another</a></p>
+{% endif %}{% endblock %}

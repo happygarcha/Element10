@@ -1,0 +1,26 @@
+{% extends 'base.html' %}{% block title %}Dashboard{% endblock %}{% block body %}
+<h2>Dashboard</h2><p class="sub">Your private Amazon.ca and Amazon.com research workbench.</p>
+<div class="grid g4">
+  <div class="card stat"><b>{{ counts.products }}</b><span>products</span></div>
+  <div class="card stat"><b>{{ counts.watch }}</b><span>watched</span></div>
+  <div class="card stat"><b>{{ counts.keywords }}</b><span>keywords</span></div>
+  <div class="card stat"><b>{{ counts.alerts }}</b><span>open alerts</span></div>
+</div>
+{% if fx_missing %}<div class="notice warn">No USD to CAD exchange rate is set. Calculations that convert currency will stop with an error until you add one in <a href="/settings">Settings</a>. Rates are never guessed.</div>{% endif %}
+{% if profile_unverified and mode != 'demo' %}<div class="notice warn">Fee profiles for {{ profile_unverified|join(' and ') }} are unverified starter values. Check them against Seller Central's FBA Revenue Calculator in <a href="/settings">Settings</a>.</div>{% endif %}
+{% if counts.products == 0 %}
+<div class="empty" style="margin-top:14px"><b>Nothing here yet.</b><br>Import a product CSV you exported from Seller Central or another tool, or switch to demo mode to try every screen with fictional data.<br><br>
+<a class="btn" href="/import">Import a CSV</a></div>
+{% else %}
+<h3>Highest opportunity scores</h3>
+<div class="card wrap"><table><tr><th>Product</th><th>Market</th><th class="n">Price</th><th class="n">Rank</th><th class="n">Reviews</th><th class="n">Score</th></tr>
+{% for r in top %}<tr><td><a href="/products/{{ r.p.id }}">{{ r.p.title|short(50) or r.p.asin }}</a></td><td>{{ m.mp(r.p.marketplace) }}</td>
+<td class="n">{{ m.cell(r.lat,'price',2) }}</td><td class="n">{{ m.cell(r.lat,'bsr') }}</td><td class="n">{{ m.cell(r.lat,'reviews') }}</td>
+<td class="n"><span class="score">{{ r.score if r.score is not none else '–' }}</span></td></tr>{% endfor %}</table></div>
+<p class="sub">Scores use only the factors your data supports. Open a product to see exactly which ones.</p>
+{% endif %}
+<h3>Recent imports</h3>
+{% if imports %}<div class="card wrap"><table><tr><th>When</th><th>File</th><th>Type</th><th>Market</th><th>Source label</th><th class="n">Rows</th></tr>
+{% for i in imports %}<tr><td>{{ i.uploaded_at[:16] }}</td><td>{{ i.filename }}</td><td>{{ i.kind }}</td><td>{{ i.marketplace }}</td><td>{{ i.source_label|short(40) }}</td><td class="n">{{ i.rows_ok }}{% if i.rows_skipped %} (+{{ i.rows_skipped }} skipped){% endif %}</td></tr>{% endfor %}</table></div>
+{% else %}<p class="sub">No imports yet.</p>{% endif %}
+{% endblock %}

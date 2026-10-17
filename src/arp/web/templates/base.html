@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="csrf" content="{{ csrf }}">
+<title>{% block title %}Amazon Research{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{% import 'macros.html' as m %}
+<div class="shell">
+<nav class="side" aria-label="Main">
+  <h1>Amazon research</h1>
+  {% for href, label in [('/', 'Dashboard'), ('/products', 'Products'), ('/import', 'Import CSV'), ('/calculator', 'Profit calculator'), ('/watchlists', 'Watchlists'), ('/alerts', 'Alerts'), ('/keywords', 'Keywords'), ('/listing-audit', 'Listing audit'), ('/projects', 'Projects & reports'), ('/sources', 'Data sources'), ('/settings', 'Settings')] %}
+  <a href="{{ href }}" class="{{ 'on' if (nav == href or (href != '/' and nav.startswith(href))) else '' }}">{{ label }}</a>
+  {% endfor %}
+  <div class="grp">Mode</div>
+  <form method="post" action="/mode" style="padding:0 10px">
+    {{ m.csrf_field() }}
+    <input type="hidden" name="mode" value="{{ 'live' if mode == 'demo' else 'demo' }}">
+    <button class="ghost" type="submit">Switch to {{ 'live research' if mode == 'demo' else 'demo mode' }}</button>
+  </form>
+</nav>
+<main>
+  {% if mode == 'demo' %}<div class="banner"><b>DEMO MODE.</b> Everything here is fictional sample data. It is stored separately and never mixed with your live research.</div>{% endif %}
+  {% block body %}{% endblock %}
+</main>
+</div>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

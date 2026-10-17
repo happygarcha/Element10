@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}Projects{% endblock %}{% block body %}
+<h2>Projects &amp; reports</h2><p class="sub">Group products and calculations into a research project, then download a CSV or open a printable report.</p>
+<form class="card" method="post" action="/projects" style="max-width:520px">{{ m.csrf_field() }}<label>New project</label><input type="text" name="name" required maxlength="80"><label>Notes</label><textarea name="notes" rows="2"></textarea><p><button>Create</button></p></form>
+<h3>Projects</h3>{% if not rows %}<div class="empty">No projects yet.</div>{% else %}<div class="card wrap"><table><tr><th>Name</th><th class="n">Products</th><th>Created</th></tr>{% for r in rows %}<tr><td><a href="/projects/{{ r.id }}">{{ r.name }}</a></td><td class="n">{{ r.n }}</td><td>{{ r.created_at[:10] }}</td></tr>{% endfor %}</table></div>{% endif %}{% endblock %}

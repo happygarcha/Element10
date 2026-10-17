@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}Settings{% endblock %}{% block body %}
+<h2>Settings</h2>
+<h3>Exchange rates</h3><form class="card" method="post" action="/settings/fx" style="max-width:520px">{{ m.csrf_field() }}
+<p class="sub">Entered by you; the app never fetches or guesses rates. {% if fx.get('updated_at') %}Last saved {{ fx.updated_at[:16] }}.{% endif %}</p>
+<label>1 USD in CAD</label><input type="number" step="any" min="0" name="usd_cad" value="{{ fx.get('USD_CAD') or '' }}">
+<label>1 CNY in USD (optional, for suppliers priced in yuan)</label><input type="number" step="any" min="0" name="cny_usd" value="{{ fx.get('CNY_USD') or '' }}"><p><button>Save rates</button></p></form>
+<h3>Fee profiles</h3><p class="sub">Open Seller Central's FBA Revenue Calculator for a similar product and copy the figures. Tick "verified" only after you have checked every value. Starter values are unverified, and the calculator warns while a profile is unverified.</p>
+<div class="grid g2">{% for mp, pr in profiles.items() %}<form class="card" method="post" action="/settings/profile/{{ mp }}">{{ m.csrf_field() }}<b>Amazon.{{ 'ca (CAD)' if mp=='CA' else 'com (USD)' }}</b> {% if pr.verified_at %}<span class="chip observed">verified {{ pr.verified_at[:10] }}</span>{% else %}<span class="chip estimated">unverified</span>{% endif %}
+<div class="row">{% for k, v in pr.data.items() %}<div><label>{{ k.replace('_',' ') }}</label><input type="number" step="any" min="0" name="{{ k }}" value="{{ v }}"></div>{% endfor %}</div>
+<label>Where these figures came from</label><input type="text" name="source_note" value="{{ pr.source_note or '' }}">
+<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="verified" style="width:auto" {{ 'checked' if pr.verified_at }}> I checked these against Seller Central</label><p><button>Save {{ mp }} profile</button></p></form>{% endfor %}</div>
+<h3>Opportunity score</h3><form class="card" method="post" action="/settings/scoring">{{ m.csrf_field() }}<p class="sub">Weights (relative importance) and the numbers each factor uses. Missing data is skipped and the weights are renormalised.</p>
+<div class="row">{% for k, v in weights.items() %}<div><label>weight: {{ k.replace('_',' ') }}</label><input type="number" step="any" min="0" name="w_{{ k }}" value="{{ v }}"></div>{% endfor %}</div>
+<div class="row">{% for k, v in params.items() %}<div><label>{{ k.replace('_',' ') }}</label><input type="number" step="any" name="p_{{ k }}" value="{{ v }}"></div>{% endfor %}</div><p><button>Save scoring</button></p></form>
+{% endblock %}

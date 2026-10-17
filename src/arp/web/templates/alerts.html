@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block title %}Alerts{% endblock %}{% block body %}
+<h2>Alerts</h2>{% if not rows %}<div class="empty">No alerts. Create rules on a watchlist; they are checked whenever you import new numbers.</div>{% else %}
+<div class="card wrap"><table><tr><th>When</th><th>Product</th><th>Market</th><th>What happened</th><th></th></tr>
+{% for a in rows %}<tr style="{{ 'opacity:.55' if a.acknowledged }}"><td>{{ a.triggered_at[:16] }}</td><td><a href="/products/{{ a.product_id }}">{{ a.title|short(40) or a.asin }}</a></td><td>{{ m.mp(a.marketplace) }}</td><td>{{ a.message }}</td>
+<td>{% if not a.acknowledged %}<form class="inline" method="post" action="/alerts/{{ a.id }}/ack">{{ m.csrf_field() }}<button class="link">dismiss</button></form>{% endif %}</td></tr>{% endfor %}</table></div>{% endif %}{% endblock %}

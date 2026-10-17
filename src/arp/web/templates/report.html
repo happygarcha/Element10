@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block title %}Report: {{ pr.name }}{% endblock %}{% block body %}
+<h2>Research report: {{ pr.name }}</h2><p class="sub">Generated {{ generated }}. {{ 'Contains FICTIONAL SAMPLE DATA. ' if mode == 'demo' }}Every figure below carries the type and source shown in the last columns. Types: observed, user supplied, calculated, estimated, sample.</p>
+<p class="noprint"><button onclick="window.print()">Print</button></p>
+{% if pr.notes %}<p>{{ pr.notes }}</p>{% endif %}
+<div class="card wrap"><table><tr>{% for c in cols %}<th>{{ c.replace('_',' ') }}</th>{% endfor %}</tr>{% for r in rows %}<tr>{% for c in cols %}<td>{{ r[c] if r[c] is not none else '–' }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% if calcs %}<h3>Profit calculations</h3>{% for c, o in calcs %}<div class="card" style="margin-bottom:10px"><b>#{{ c.id }} {{ c.label or '' }}</b> ({{ c.marketplace }}, {{ o.currency }}): price {{ o.sell_price|money }}, profit {{ o.profit|money }} per unit, margin {{ o.margin_pct|num(1) }}%, break-even {{ o.break_even_price|money }}.</div>{% endfor %}{% endif %}
+<p class="sub">This report is a research aid, not a prediction. Estimated and user-supplied numbers can be wrong.</p>{% endblock %}

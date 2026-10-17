@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block title %}Keywords{% endblock %}{% block body %}
+<h2>Keywords</h2>
+<p class="sub">Keyword numbers come from CSVs you import (for example Seller Central Brand Analytics, Helium 10 or a Google Keyword Planner export). <b>Reverse-ASIN and automatic rank tracking need a licensed data provider and are not connected</b>; see <a href="/sources">Data sources</a>. You can import ranks you collect yourself.</p>
+<p><a class="btn {{ '' if mp=='US' else 'ghost' }}" href="?marketplace=US">Amazon.com</a> <a class="btn {{ '' if mp=='CA' else 'ghost' }}" href="?marketplace=CA">Amazon.ca</a> <a class="btn ghost" href="/import">Import keywords</a></p>
+{% if not items %}<div class="empty">No keywords for this marketplace yet.</div>{% else %}
+<h3>Clusters</h3><p class="sub">Phrases grouped by shared stems. {{ m.kind('calculated') }}</p>
+<div class="grid g2">{% for c in clusters %}<div class="card"><b>{{ c.label }}</b> <span class="chip">{{ c.size }} phrase{{ 's' if c.size != 1 }}</span>{% if c.total_volume is not none %} <span class="chip">{{ c.total_volume|num }} searches</span>{% endif %}
+<div class="sub">{{ c.members|map(attribute='phrase')|join(' · ') }}</div></div>{% endfor %}</div>
+<h3>All keywords</h3><div class="card wrap"><table><tr><th>Keyword</th><th class="n">Search volume</th><th class="n">Competition</th><th>Type</th><th>Source</th></tr>
+{% for k in items %}{% set o = k.obs.get('search_volume') or k.obs.get('competition') %}<tr><td>{{ k.phrase }}</td><td class="n">{{ k.volume|num }}</td><td class="n">{{ k.competition|num }}</td><td>{% if o %}{{ m.kind(o.kind) }}{% endif %}</td><td><small>{{ o.source|short(40) if o }}</small></td></tr>{% endfor %}</table></div>{% endif %}{% endblock %}

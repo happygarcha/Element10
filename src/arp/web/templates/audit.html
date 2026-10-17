@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}Listing audit{% endblock %}{% block body %}
+<h2>Listing audit</h2><p class="sub">Rule-based checks of your draft against your keyword list. Limits are adjustable defaults, not Amazon facts: they vary by category, so confirm them in Seller Central's style guide. This tool does not write copy with AI.</p>
+<div class="grid g2" style="align-items:start"><form class="card" method="post">{{ m.csrf_field() }}
+<label>Title</label><input type="text" name="title" value="{{ form.get('title','') }}">
+<label>Bullet points (one per line)</label><textarea name="bullets" rows="6">{{ form.get('bullets','') }}</textarea>
+<label>Description (optional)</label><textarea name="description">{{ form.get('description','') }}</textarea>
+<label>Keywords, one per line, optionally "phrase, volume"</label><textarea name="keywords" rows="6">{{ form.get('keywords','') }}</textarea>
+<div class="row"><div><label>Title limit (characters)</label><input type="number" name="title_max" value="{{ form.get('title_max', 200) }}"></div><div><label>Bullet limit</label><input type="number" name="bullet_max" value="{{ form.get('bullet_max', 500) }}"></div></div>
+<h3>Title starter (optional)</h3><div class="row"><div><label>Brand</label><input type="text" name="brand" value="{{ form.get('brand','') }}"></div><div><label>Main keyword</label><input type="text" name="primary" value="{{ form.get('primary','') }}"></div><div><label>Attributes, comma separated</label><input type="text" name="attributes" value="{{ form.get('attributes','') }}"></div></div>
+<p><button>Audit listing</button></p></form>
+<div>{% if res %}{% if skeleton %}<div class="card"><b>Title starter</b><p>{{ skeleton }}</p><small class="sub">{{ skeleton|length }} characters. A starting point only: check it reads naturally.</small></div>{% endif %}
+<div class="card"{% if skeleton %} style="margin-top:12px"{% endif %}><b>Findings</b>{% for f in res.findings %}<div class="line"><span class="pill-{{ 'bad' if f.level=='problem' else 'warn' if f.level=='warning' else 'ok' }}">{{ f.level }}</span><span style="flex:1;padding-left:10px"><b>{{ f.area }}</b>: {{ f.message }}</span></div>{% else %}<p class="sub">Nothing to report.</p>{% endfor %}</div>
+{% if res.coverage %}<div class="card" style="margin-top:12px"><b>Keyword coverage{% if res.coverage_pct is not none %}: {{ res.coverage_pct }}%{% endif %}</b><div class="wrap"><table><tr><th>Keyword</th><th class="n">Volume</th><th>Title</th><th>Bullets</th><th>Status</th></tr>{% for c in res.coverage %}<tr><td>{{ c.phrase }}</td><td class="n">{{ c.volume|num }}</td><td>{{ 'yes' if c.in_title else '–' }}</td><td>{{ 'yes' if c.in_bullets else '–' }}</td><td>{{ c.status }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if res.readability.flesch is not none %}<div class="card" style="margin-top:12px"><b>Readability</b> (bullets and description): Flesch {{ res.readability.flesch }}, {{ res.readability.avg_sentence_words }} words per sentence. {{ m.kind('calculated') }}</div>{% endif %}
+{% else %}<div class="empty">Paste a draft and keywords, then run the audit.</div>{% endif %}</div></div>{% endblock %}
