@@ -170,3 +170,21 @@ test("account: cannot delete somebody else (id comes from the verified login, no
   await account(req({ action: "delete", confirm: "me@example.com", user_id: "victim" }), { ...ENV, SUPABASE_SERVICE_ROLE_KEY: "k1234" }, f);
   assert.ok(url.endsWith("/u1") && !url.includes("victim"));
 });
+
+// ---- Keepa finder + DataForSEO related (fixtures; shapes written from provider docs, unverified live)
+import { buildSelection } from "../supabase/functions/keepa/handler.js";
+test("keepa finder: selection built in Keepa units, unknown filters dropped, needs a filter", async () => {
+  const s = buildSelection({ price_min: 10, price_max: 30, rating_min: 4, reviews_max: 200, rank_max: 50000, evil: "x" });
+  assert.equal(s.current_NEW_gte, 1000); assert.equal(s.current_NEW_lte, 3000); assert.equal(s.current_RATING_gte, 40); assert.equal(s.current_COUNT_REVIEWS_lte, 200); assert.equal(s.current_SALES_lte, 50000); assert.ok(!("evil" in s));
+  const f = fetcher([["api.keepa.com/query", (u) => json({ asinList: ["B000000001", "bad", "B000000002"], tokensLeft: 80, tokensConsumed: 11 })]]);
+  assert.equal((await keepa(req({ marketplace: "US", action: "finder", filters: {} }), ENV, f)).status, 400);
+  const r = await keepa(req({ marketplace: "CA", action: "finder", filters: { price_max: 20 } }), ENV, f), j = await r.json();
+  assert.deepEqual(j.asins, ["B000000001", "B000000002"]); assert.match(f.calls.at(-1).url, /domain=6/); assert.ok(!JSON.stringify(j).includes("KEEPA-SECRET"));
+  assert.equal((await keepa(req({ marketplace: "CA", action: "finder", filters: { price_max: 20 } }), ENV, fetcher([["api.keepa.com/query", json({ foo: 1 })]]))).status, 502);
+});
+test("dataforseo related: parsed, null volume kept null, seed required", async () => {
+  const f = fetcher([["related_keywords/live", json({ cost: 0.02, tasks: [{ status_code: 20000, result: [{ items: [{ keyword_data: { keyword: "Thick Yoga Mat", keyword_info: { search_volume: 300 } } }, { keyword_data: { keyword: "odd", keyword_info: {} } }] }] }] })]]);
+  const j = await (await dfs(req({ marketplace: "US", action: "related", keyword: "yoga mat" }), ENV, f)).json();
+  assert.deepEqual(j.items, [{ keyword: "thick yoga mat", search_volume: 300 }, { keyword: "odd", search_volume: null }]);
+  assert.equal((await dfs(req({ marketplace: "US", action: "related", keyword: "" }), ENV, f)).status, 400);
+});

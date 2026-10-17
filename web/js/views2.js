@@ -56,13 +56,21 @@ export async function liveCard(ctx, p) {
 export async function keywordLookup(ctx, mp) {
   const st = await liveStatus(ctx);
   if (!st.available || !st.dataforseo) return { html: h`<div class="card"><h3 style="margin-top:0">Look up search volume</h3><p class="sub">${st.available ? "DataForSEO is not configured on your server." : st.why} Volumes are never guessed: without a licensed provider, import a CSV you are entitled to export.</p></div>`, after() {} };
-  return { html: h`<div class="card"><h3 style="margin-top:0">Look up search volume (paid, DataForSEO)</h3><form id="kv"><label>Keywords, one per line (max 100)</label><textarea name="k" rows="4" required></textarea><p><button>Look up</button> <span class="sub">You confirm before anything is charged. Volumes are the provider's estimates.</span></p></form><div id="kvres" aria-live="polite"></div></div>`,
+  return { html: h`<div class="card"><h3 style="margin-top:0">Look up search volume (paid, DataForSEO)</h3><form id="kv"><label>Keywords, one per line (max 100)</label><textarea name="k" rows="4" required></textarea><p><button>Look up</button> <span class="sub">You confirm before anything is charged. Volumes are the provider's estimates.</span></p></form><div id="kvres" aria-live="polite"></div>
+    <form id="kx" style="margin-top:14px"><label>Expand a seed keyword into related keywords (paid, DataForSEO)</label><input type="text" name="seed" maxlength="80" required placeholder="e.g. yoga mat"><p><button>Expand</button></p></form><div id="kxres" aria-live="polite"></div></div>`,
     after(root) { root.querySelector("#kv").addEventListener("submit", async (e) => {
       e.preventDefault(); const kws = [...new Set(fd(e.target).k.split("\n").map((s) => s.trim().toLowerCase()).filter(Boolean))].slice(0, 100);
       if (!confirm(`Look up ${kws.length} keyword(s) on Amazon.${mp === "CA" ? "ca" : ".com"}? DataForSEO bills your account for this.`)) return;
       resultBox(root, "#kvres", true, "Working…");
       try { const r = await callFn(ctx.client, "dataforseo", { marketplace: mp, action: "volume", keywords: kws }); const o = await ingestVolumes(ctx.store, mp, r); resultBox(root, "#kvres", true, `Saved ${o.kept} volumes; ${o.no_data} had no data from the provider (left blank). Cost: ${r.cost_usd ?? "unknown"} USD.`); setTimeout(ctx.refresh, 900); }
       catch (err) { resultBox(root, "#kvres", false, err.message); }
+    });
+    root.querySelector("#kx").addEventListener("submit", async (e) => {
+      e.preventDefault(); const seed = fd(e.target).seed.trim().toLowerCase();
+      if (!confirm(`Expand "${seed}" on Amazon.${mp === "CA" ? "ca" : ".com"}? DataForSEO bills your account for this.`)) return;
+      resultBox(root, "#kxres", true, "Working…");
+      try { const r = await callFn(ctx.client, "dataforseo", { marketplace: mp, action: "related", keyword: seed, limit: 50 }); const o = await ingestVolumes(ctx.store, mp, r); resultBox(root, "#kxres", true, `Saved ${o.kept} related keywords with volume; ${o.no_data} had no volume (not saved). Cost: ${r.cost_usd ?? "unknown"} USD.`); setTimeout(ctx.refresh, 900); }
+      catch (err) { resultBox(root, "#kxres", false, err.message); }
     }); } };
 }
 
@@ -119,4 +127,26 @@ export async function securityCard(ctx) {
   return h`<h3>Security check</h3><div class="card">${checks.map((c) => h`<div class="line"><span>${c.ok ? "✔" : "✖"} ${c.name}<br><small>${c.detail}</small></span><span class="${c.ok ? "pill-ok" : "pill-bad"}">${c.ok ? "ok" : "fix"}</span></div>`)}
   ${st ? h`<div class="line"><span>Server functions reachable<br><small>${st.available ? "Providers configured on the server: " + (["spapi", "keepa", "dataforseo"].filter((k) => st[k]).join(", ") || "none") : st.why}</small></span><span class="${st.available ? "pill-ok" : "pill-warn"}">${st.available ? "ok" : "not deployed"}</span></div>` : ""}
   <p class="sub">Row-level security can only be proven in your Supabase project: run supabase/tests/rls_check.sql there (docs/06).</p></div>`;
+}
+
+// ---- product finder (Keepa): filters -> ASIN list -> fetch details for the ones you pick
+export async function finderCard(ctx) {
+  const st = await liveStatus(ctx);
+  if (!st.available || !st.keepa) return { html: h`<div class="card"><h3 style="margin-top:0">Find products on Amazon (Keepa)</h3><p class="sub">${st.available ? "Keepa is not configured on your server (paid plan needed)." : st.why} Until a licensed source is connected this table shows only products you imported.</p></div>`, after() {} };
+  const mpSel = (n) => h`<select name="${n}"><option value="US">Amazon.com</option><option value="CA">Amazon.ca</option></select>`;
+  return { html: h`<div class="card"><h3 style="margin-top:0">Find products on Amazon (Keepa, uses paid tokens)</h3><form id="pf2"><div class="row"><div><label>Marketplace</label>${mpSel("marketplace")}</div><div><label>Min price</label><input type="number" step="any" min="0" name="price_min"></div><div><label>Max price</label><input type="number" step="any" min="0" name="price_max"></div><div><label>Min rating</label><input type="number" step="0.1" min="0" max="5" name="rating_min"></div><div><label>Max reviews</label><input type="number" min="0" name="reviews_max"></div><div><label>Best rank at most</label><input type="number" min="1" name="rank_max"></div><div><label>Best rank at least</label><input type="number" min="1" name="rank_min"></div><div><label>Keepa category id (optional)</label><input type="number" min="0" name="category_id"></div></div><p><button>Search</button> <span class="sub">Returns ASINs only; details cost more tokens.</span></p></form><div id="pfres" aria-live="polite"></div></div>`,
+    after(root) {
+      let last = null;
+      root.querySelector("#pf2").addEventListener("submit", async (e) => {
+        e.preventDefault(); const d = fd(e.target), filters = Object.fromEntries(Object.entries(d).filter(([k, v]) => k !== "marketplace" && v !== ""));
+        if (!Object.keys(filters).length) return resultBox(root, "#pfres", false, "Set at least one filter.");
+        if (!confirm("This uses Keepa tokens on your paid plan. Continue?")) return; resultBox(root, "#pfres", true, "Working…");
+        try { last = await callFn(ctx.client, "keepa", { marketplace: d.marketplace, action: "finder", filters }); last.mp = d.marketplace;
+          root.querySelector("#pfres").className = ""; root.querySelector("#pfres").innerHTML = h`<p>${last.asins.length} ASINs matched (tokens left: ${last.tokens_left ?? "unknown"}). Tick up to 10 to fetch details:</p><div class="row">${last.asins.slice(0, 50).map((a, i) => h`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" class="fa" value="${a}" ${raw(i < 10 ? "checked" : "")}> ${a}</label>`)}</div><p><button id="fd">Fetch details for ticked (≈1 token each)</button> <span id="fdres" aria-live="polite"></span></p>`.__raw;
+          root.querySelector("#fd").addEventListener("click", async () => { const picked = [...root.querySelectorAll(".fa:checked")].map((x) => x.value).slice(0, 10); if (!picked.length) return;
+            if (!confirm(`Fetch ${picked.length} products from Keepa (about ${picked.length} tokens)?`)) return; resultBox(root, "#fdres", true, "Working…");
+            try { const r = await callFn(ctx.client, "keepa", { marketplace: last.mp, asins: picked }); const o = await ingestKeepa(ctx.store, last.mp, r); resultBox(root, "#fdres", true, `Saved ${o.observations} data points for ${o.items.length} products.`); setTimeout(ctx.refresh, 900); } catch (err) { resultBox(root, "#fdres", false, err.message); } });
+        } catch (err) { resultBox(root, "#pfres", false, err.message); }
+      });
+    } };
 }

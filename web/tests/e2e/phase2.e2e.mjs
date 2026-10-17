@@ -31,6 +31,13 @@ await p.goto(base + "#/keywords?marketplace=US"); await p.waitForSelector("#kv")
 await p.waitForFunction(() => document.querySelector("#kvres").textContent.includes("Saved 1 volumes"));
 ok("keyword lookup keeps blanks blank (1 saved, 1 no data)", (await p.textContent("#kvres")).includes("1 had no data"));
 await p.waitForFunction(() => document.querySelector("#view").textContent.includes("yoga mat")); ok("only the keyword with data is listed", !(await p.textContent("#view")).includes("unknown thing"));
+// finder + seed expansion
+await p.goto(base + "#/products"); await p.waitForSelector("#pf2"); await p.fill("#pf2 input[name=price_max]", "30"); await p.click("#pf2 button"); await p.waitForSelector(".fa");
+ok("product finder lists ASINs from the provider", (await p.$$(".fa")).length === 2);
+await p.click("#fd"); await p.waitForFunction(() => document.querySelector("#fdres") && document.querySelector("#fdres").textContent.includes("Saved"));
+ok("finder details fetched and stored (observed)", JSON.parse(await p.evaluate(() => sessionStorage.getItem("stubdb"))).products.some((x) => x.asin === "B0FINDER01"));
+await p.goto(base + "#/keywords?marketplace=US"); await p.waitForSelector("#kx"); await p.fill("#kx input[name=seed]", "yoga mat"); await p.click("#kx button"); await p.waitForFunction(() => document.querySelector("#kxres").textContent.includes("Saved 1 related"));
+ok("seed expansion saves only keywords that have volume", (await p.textContent("#kxres")).includes("1 had no volume"));
 // suppliers, ranks, sources, settings
 await p.goto(base + "#/suppliers"); await p.fill("input[name=name]", "Acme"); await p.fill("input[name=cost]", "3.5"); await p.click("#sf button"); await p.waitForSelector("text=Acme");
 ok("supplier quote saved", (await p.textContent("#view")).includes("Acme"));

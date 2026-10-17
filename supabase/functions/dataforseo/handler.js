@@ -22,6 +22,10 @@ export function parseRanked(result) {
   return result.items.map((i) => ({ keyword: String(((i.keyword_data || {}).keyword) || "").toLowerCase(),
     search_volume: (((i.keyword_data || {}).keyword_info) || {}).search_volume ?? null, rank: (((i.ranked_serp_element || {}).serp_item) || {}).rank_absolute ?? null })).filter((x) => x.keyword);
 }
+export function parseRelated(result) {
+  if (!Array.isArray(result.items)) throw new HttpError(502, "Unexpected DataForSEO response (no items).");
+  return result.items.map((i) => ({ keyword: String(((i.keyword_data || {}).keyword) || "").toLowerCase(), search_volume: (((i.keyword_data || {}).keyword_info) || {}).search_volume ?? null })).filter((x) => x.keyword);
+}
 export const handle = endpoint(async (body, env, f) => {
   const m = market(body), base = { source: "DataForSEO Labs Amazon API", as_of: nowIso(), marketplace: body.marketplace, location_code: m.dfsLocation };
   if (body.action === "volume") {
@@ -36,5 +40,12 @@ export const handle = endpoint(async (body, env, f) => {
     const { result, cost } = await post(f, env, "ranked_keywords/live", [{ asin, location_code: m.dfsLocation, language_code: "en", limit }]);
     return { ...base, asin, items: parseRanked(result), cost_usd: cost };
   }
-  throw new HttpError(400, "action must be volume or ranked.");
+  if (body.action === "related") {
+    const seed = String(body.keyword || "").trim().toLowerCase();
+    if (!seed || seed.length > 80) throw new HttpError(400, "Provide a seed keyword (80 characters or fewer).");
+    const limit = Math.min(Number(body.limit) || 50, 100);
+    const { result, cost } = await post(f, env, "related_keywords/live", [{ keyword: seed, location_code: m.dfsLocation, language_code: "en", depth: 1, limit }]);
+    return { ...base, seed, items: parseRelated(result), cost_usd: cost };
+  }
+  throw new HttpError(400, "action must be volume, ranked or related.");
 }, { perHour: 30 });

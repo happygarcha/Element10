@@ -11,7 +11,7 @@ import { feeProfile, fxFor, fxRates, latest, productRows, saveCalc, saveFeeProfi
 import { TABLES } from "./store.js";
 import { download, h, kindChip, mpChip, raw, spark, toCSV } from "./ui.js";
 import { CURRENCY, amazonSearchUrl, amazonUrl, fnum, money, now, num } from "./util.js";
-import { keywordLookup, liveCard, liveStatus, securityCard, snapshot, snapshotHtml } from "./views2.js";
+import { finderCard, keywordLookup, liveCard, liveStatus, securityCard, snapshot, snapshotHtml } from "./views2.js";
 
 const cell = (lat, key, d = 0) => { const o = lat[key]; return o && o.value_num != null ? h`<span title="${o.kind.replace("_", " ")} · ${o.source} · ${(o.as_of || "").slice(0, 10)}">${num(o.value_num, d)}</span>` : raw("–"); };
 const short = (s, n = 60) => ((s || "").length > n ? s.slice(0, n) + "…" : s || "");
@@ -43,12 +43,14 @@ export async function home({ store, mode }) {
 }
 
 /* ---------------- products ---------------- */
-export async function products({ store, q, refresh }) {
+export async function products(ctx) {
+  const { store, q, refresh } = ctx, finder = await finderCard(ctx);
   const saved = store.setting("saved_searches", []);
   const f = {}; for (const k of ["marketplace", "q", "category", "sort", "dir"]) if (q.get(k)) f[k] = q.get(k);
   for (const k of ["price_min", "price_max", "reviews_max", "rating_max", "rank_min", "rank_max", "units_min", "margin_min"]) f[k] = fnum(q.get(k));
   const rows = productRows(store, f), g = (k) => q.get(k) || "";
   const html = h`<h2>Products</h2><p class="sub">${rows.length} shown. Numbers keep their source and date: hover any value. A missing value never passes a filter on that value.</p>
+  ${finder.html}
   <form class="card filters" id="flt"><div class="row">
   <div><label>Search</label><input type="search" name="q" value="${g("q")}" placeholder="title, ASIN, brand"></div>
   ${sel("marketplace", "Marketplace", [["", "Both"], ["CA", "CA"], ["US", "US"]], g("marketplace"))}
@@ -67,6 +69,7 @@ export async function products({ store, q, refresh }) {
   <td class="n"><span class="score" title="${r.used} of ${r.total} factors had data">${r.score ?? "–"}</span></td></tr>`)}</table></div>`}`;
   return { html, after(root) {
     root.querySelector("#flt").addEventListener("submit", (e) => { e.preventDefault(); const d = formData(e.target), p = new URLSearchParams(); for (const [k, v] of Object.entries(d)) if (v !== "") p.set(k, v); location.hash = "#/products" + (p.toString() ? "?" + p : ""); });
+    finder.after(root);
     root.querySelector("#savesearch").addEventListener("click", async () => { const name = (prompt("Name this search") || "").trim().slice(0, 40); if (!name) return; const qs = q.toString(); await store.setSetting("saved_searches", [...saved.filter((x) => x.name !== name), { name, qs }].slice(-20)); refresh(); });
     root.querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", async () => { await store.setSetting("saved_searches", saved.filter((_, i) => i !== Number(b.dataset.rm))); refresh(); }));
     const c = root.querySelector("#cmp"); if (c) c.addEventListener("click", () => { const ids = [...root.querySelectorAll(".pick:checked")].map((x) => x.value).slice(0, 8); location.hash = "#/compare?ids=" + ids.join(","); });

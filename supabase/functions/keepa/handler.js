@@ -21,7 +21,33 @@ export function parseProduct(p) {
     monthly_sold: p.monthlySold != null && p.monthlySold >= 0 ? p.monthlySold : null,
     history: { price: series(csv[IDX.new], true), bsr: series(csv[IDX.rank], false) } };
 }
+// Product Finder: Keepa's /query endpoint takes a JSON "selection" and returns matching ASINs only (details then cost tokens).
+// Field names (current_NEW_gte in cents, current_RATING_gte x10, current_SALES = sales rank, current_COUNT_REVIEWS, rootCategory) follow Keepa's
+// published Product Finder docs as recalled when written; NOT yet run against live Keepa. Unknown filters are never forwarded.
+export function buildSelection(f = {}) {
+  const sel = { productType: [0], perPage: Math.max(50, Math.min(Number(f.limit) || 50, 100)), page: 0 };
+  const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const put = (key, v, scale = 1) => { const n = num(v); if (n != null) sel[key] = Math.round(n * scale); };
+  put("current_NEW_gte", f.price_min, 100); put("current_NEW_lte", f.price_max, 100);
+  put("current_RATING_gte", f.rating_min, 10); put("current_RATING_lte", f.rating_max, 10);
+  put("current_COUNT_REVIEWS_gte", f.reviews_min); put("current_COUNT_REVIEWS_lte", f.reviews_max);
+  put("current_SALES_gte", f.rank_min); put("current_SALES_lte", f.rank_max);
+  const cat = num(f.category_id); if (cat != null) sel.rootCategory = [cat];
+  return sel;
+}
 export const handle = endpoint(async (body, env, f) => {
+  if (body.action === "finder") {
+    if (!env.KEEPA_API_KEY) throw new HttpError(503, "Keepa is not configured on the server (paid API key needed).");
+    const m = market(body), sel = buildSelection(body.filters);
+    if (Object.keys(sel).length <= 3 && !sel.rootCategory) throw new HttpError(400, "Set at least one filter (price, rating, reviews, rank or category).");
+    const r = await f(`https://api.keepa.com/query?key=${encodeURIComponent(env.KEEPA_API_KEY)}&domain=${m.keepaDomain}&selection=${encodeURIComponent(JSON.stringify(sel))}`);
+    if (r.status === 429) throw new HttpError(429, "Keepa token allowance used up. Wait for tokens to refill.");
+    if (!r.ok) throw new HttpError(502, `Keepa returned HTTP ${r.status}.`);
+    const j = await r.json(); if (j.error) throw new HttpError(502, `Keepa error: ${j.error.message || "unknown"}`);
+    if (!Array.isArray(j.asinList)) throw new HttpError(502, "Unexpected Keepa response (no asinList).");
+    return { source: "Keepa Product Finder", as_of: nowIso(), marketplace: body.marketplace, selection: sel, asins: j.asinList.filter((a) => /^[A-Z0-9]{10}$/.test(a)), tokens_left: j.tokensLeft ?? null, tokens_consumed: j.tokensConsumed ?? null,
+      cost: "uses Keepa tokens on your paid plan (finder results are ASINs only; details cost more tokens)" };
+  }
   if (!env.KEEPA_API_KEY) throw new HttpError(503, "Keepa is not configured on the server (paid API key needed).");
   const m = market(body), list = asins(body.asins, 10);
   const url = `https://api.keepa.com/product?key=${encodeURIComponent(env.KEEPA_API_KEY)}&domain=${m.keepaDomain}&asin=${list.join(",")}&stats=90&history=1`;
