@@ -65,3 +65,18 @@ Skip this section if you only use CSV imports. Nothing here is required for logi
 5. Open Element10 -> Data sources: each provider shows "secrets set". Then use the Fetch buttons on a product page.
 6. Run `supabase/tests/rls_check.sql` in the SQL editor: every row should show `ok = true`.
 The functions verify your login with Supabase, only answer `ALLOWED_EMAILS`, cap request sizes and call rates, and never return a secret.
+
+## Authentication redirects (Supabase -> Authentication -> URL Configuration)
+- **Site URL:** `https://<your-github-name>.github.io/element10/`
+- **Redirect URLs (allow-list):** the same URL, plus `http://localhost:8771/` if you test locally.
+- Email templates (Confirm signup, Reset password) can stay default. Turn **Confirm email** ON (Authentication -> Providers -> Email) so sign-ups must be verified.
+- Free-tier Supabase sends a small number of auth emails per hour through its built-in sender; for heavier use add your own SMTP.
+
+## All server secrets and where they go
+`.env.example` lists every name. They are set only with `supabase secrets set` (server-side). `SUPABASE_SERVICE_ROLE_KEY` is injected by Supabase into functions and is used only by the `account` function to delete the caller's own user after they type their email. Deploy everything: `supabase functions deploy status spapi keepa dataforseo h10mcp account`.
+
+## Existing projects: run the new migration
+Re-run `supabase/schema.sql` (idempotent) or `supabase/migrations/0002_reviews_provider_results.sql`, then `supabase/tests/rls_check.sql`.
+
+## Background jobs
+Nothing runs on a schedule yet. Scheduled rank tracking and price monitoring would use Supabase `pg_cron` + an Edge Function calling a paid provider; it is not built because no provider is connected and each run would cost money.

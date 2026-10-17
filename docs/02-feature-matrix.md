@@ -1,3 +1,5 @@
+> **Superseded by [10-parity-matrix.md](10-parity-matrix.md)**, which is the project checklist. This older table is kept for history.
+
 # Feature matrix
 
 Status: **Built** works with the data you give it. **Interface only** has screens/adapter but needs an account or paid data.

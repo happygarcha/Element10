@@ -5,6 +5,7 @@ import { LocalAdapter, MemoryAdapter, Store, SupabaseAdapter, TABLES } from "./s
 import { seedDemo } from "./sample.js";
 import { inspectKey } from "./security.js";
 import * as V2 from "./views2.js";
+import * as V3 from "./views3.js";
 
 const cfg = window.ELEMENT10_CONFIG || {};
 const app = document.getElementById("app");
@@ -13,8 +14,12 @@ const cloudConfigured = !!(cfg.supabaseUrl && cfg.supabaseAnonKey && window.supa
 const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* storage unavailable */ } } };
 
 const S = { mode: null, store: null, client: null, user: null };
-const NAV = [["#/", "Dashboard"], ["#/products", "Products"], ["#/import", "Import CSV"], ["#/calculator", "Profit calculator"], ["#/watchlists", "Watchlists"], ["#/alerts", "Alerts"], ["#/keywords", "Keywords"], ["#/ranks", "Rank tracker"], ["#/suppliers", "Suppliers"], ["#/audit", "Listing audit"], ["#/inventory", "Inventory planner"], ["#/ads", "Ad analysis"], ["#/projects", "Projects & reports"], ["#/sources", "Data sources"], ["#/settings", "Settings"]];
-const ROUTES = [[/^$/, V.home], [/^products$/, V.products], [/^products\/(.+)$/, V.product], [/^compare$/, V.compare], [/^import$/, V.importPage], [/^calculator$/, V.calculator], [/^watchlists$/, V.watchlists], [/^alerts$/, V.alertsPage], [/^keywords$/, V.keywords], [/^ranks$/, V2.ranks], [/^suppliers$/, V2.suppliers], [/^audit$/, V.audit], [/^inventory$/, V.inventory], [/^ads$/, V.ads], [/^projects$/, V.projects], [/^projects\/(.+)$/, V.project], [/^sources$/, V.sources], [/^settings$/, V.settings]];
+const NAV = [["--", "Research"], ["#/", "Dashboard"], ["#/products", "Products"], ["#/keywords", "Keywords"], ["#/keyword-tools", "Keyword tools"], ["#/ranks", "Rank tracker"], ["#/reviews", "Review analysis"],
+  ["--", "Calculate"], ["#/calculator", "Profit calculator"], ["#/inventory", "Inventory planner"], ["#/ads", "Ad analysis"], ["#/suppliers", "Suppliers"], ["#/audit", "Listing audit"],
+  ["--", "Track"], ["#/watchlists", "Watchlists"], ["#/alerts", "Alerts"], ["#/projects", "Projects & reports"],
+  ["--", "Data"], ["#/import", "Import CSV"], ["#/h10", "Helium 10 MCP"], ["#/connections", "Connections"], ["#/sources", "Data sources"], ["#/parity", "Parity matrix"], ["#/platforms", "Platforms"],
+  ["--", "Account"], ["#/account", "Account"], ["#/settings", "Settings"]];
+const ROUTES = [[/^$/, V.home], [/^products$/, V.products], [/^products\/(.+)$/, V.product], [/^compare$/, V.compare], [/^import$/, V.importPage], [/^calculator$/, V.calculator], [/^watchlists$/, V.watchlists], [/^alerts$/, V.alertsPage], [/^keywords$/, V.keywords], [/^ranks$/, V2.ranks], [/^account$/, V3.account], [/^connections$/, V3.connections], [/^platforms$/, V3.platforms], [/^parity$/, V3.parity], [/^h10$/, V3.h10], [/^keyword-tools$/, V3.keywordTools], [/^reviews$/, V3.reviews], [/^suppliers$/, V2.suppliers], [/^audit$/, V.audit], [/^inventory$/, V.inventory], [/^ads$/, V.ads], [/^projects$/, V.projects], [/^projects\/(.+)$/, V.project], [/^sources$/, V.sources], [/^settings$/, V.settings]];
 
 function ensureClient() {
   if (!S.client && cloudConfigured) S.client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -54,7 +59,7 @@ function shell() {
   const here = location.hash.split("?")[0] || "#/";
   const label = S.mode === "cloud" ? "Your account" : S.mode === "local" ? "This device only" : "Demo mode";
   app.innerHTML = h`<header class="topbar"><button class="ghost" id="menu" aria-expanded="false" aria-controls="sidenav">☰ Menu</button><b>Element10</b></header><div class="shell"><nav class="side" id="sidenav" aria-label="Main"><h1>Element10</h1>
-  ${NAV.map(([href, l]) => h`<a href="${href}" class="${href === here || (href !== "#/" && here.startsWith(href)) ? "on" : ""}">${l}</a>`)}
+  ${NAV.map(([href, l]) => href === "--" ? h`<div class="grp">${l}</div>` : h`<a href="${href}" class="${href === here || (href !== "#/" && here.startsWith(href)) ? "on" : ""}">${l}</a>`)}
   <div class="grp">Storage</div><div class="who">${label}${S.user ? h`<br>${S.user.email}` : ""}</div>
   <div style="padding:6px 10px;display:grid;gap:6px">${cloudConfigured && S.mode !== "cloud" ? h`<button class="ghost" data-m="cloud">Use my account</button>` : ""}${S.mode !== "local" ? h`<button class="ghost" data-m="local">Use this device</button>` : ""}${S.mode !== "demo" ? h`<button class="ghost" data-m="demo">Demo mode</button>` : ""}${S.mode === "cloud" ? h`<button class="ghost" id="so">Sign out</button>` : ""}</div></nav>
   <main>${S.mode === "demo" ? h`<div class="banner"><b>DEMO MODE.</b> Everything here is fictional sample data, kept in memory only and never mixed with your real research.</div>` : ""}<div id="view"></div></main></div>`.__raw;
@@ -70,7 +75,7 @@ async function route() {
   for (const [re, fn] of ROUTES) {
     const m = path.match(re); if (!m) continue;
     try {
-      const ctx = { store: S.store, mode: S.mode, cloud: S.mode === "cloud", q, id: m[1], refresh: route, client: S.client, env: S.mode === "cloud" ? "Your Supabase database (private to your login)." : S.mode === "local" ? "Only in this browser on this device (IndexedDB). Clearing site data deletes it, so download a backup from Settings." : "Nowhere: demo data lives in memory and disappears when you leave.", migrate, exportAll, importAll };
+      const ctx = { store: S.store, mode: S.mode, cloud: S.mode === "cloud", q, id: m[1], refresh: route, client: S.client, user: S.user, env: S.mode === "cloud" ? "Your Supabase database (private to your login)." : S.mode === "local" ? "Only in this browser on this device (IndexedDB). Clearing site data deletes it, so download a backup from Settings." : "Nowhere: demo data lives in memory and disappears when you leave.", migrate, exportAll, importAll };
       const r = await fn(ctx); view.innerHTML = r.html.__raw; if (r.after) r.after(view); window.scrollTo(0, 0);
     } catch (e) { view.innerHTML = h`<div class="notice warn"><b>Something went wrong:</b> ${e.message}</div>`.__raw; console.error(e); }
     return;
@@ -117,7 +122,13 @@ async function boot() {
 }
 
 window.addEventListener("hashchange", route);
-if (cloudConfigured) ensureClient().auth.onAuthStateChange((ev) => { if (ev === "PASSWORD_RECOVERY") loginScreen("", true); });
+if (cloudConfigured) ensureClient().auth.onAuthStateChange((ev) => {
+  if (ev === "PASSWORD_RECOVERY") loginScreen("", true);
+  if (ev === "SIGNED_OUT" && S.mode === "cloud" && S.user) { S.user = null; S.store = null; loginScreen("Your session ended or expired. Sign in again; anything already saved is safe."); }
+});
+function toast(msg) { let t = document.getElementById("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; t.setAttribute("role", "alert"); document.body.appendChild(t); } t.textContent = msg; t.className = "show"; clearTimeout(toast.t); toast.t = setTimeout(() => { t.className = ""; }, 12000); }
+window.addEventListener("unhandledrejection", (e) => { toast(`A save or request failed and was NOT stored: ${(e.reason && e.reason.message) || e.reason}. Check your connection and try again.`); });
+window.addEventListener("offline", () => toast("You are offline. Changes will fail to save until the connection returns."));
 boot();
 
 // Installable app + offline shell. Only static files are cached; your data is never put in the cache.

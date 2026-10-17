@@ -7,3 +7,7 @@ verify_jwt = true
 verify_jwt = true
 [functions.status]
 verify_jwt = true
+[functions.h10mcp]
+verify_jwt = true
+[functions.account]
+verify_jwt = true

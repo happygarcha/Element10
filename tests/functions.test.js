@@ -6,6 +6,8 @@ import { resetLimits } from "../supabase/functions/_shared/common.js";
 import { handle as keepa, keepaToIso, parseProduct } from "../supabase/functions/keepa/handler.js";
 import { handle as dfs, parseVolume } from "../supabase/functions/dataforseo/handler.js";
 import { handle as spapi, parseFees, parseCatalog, resetToken } from "../supabase/functions/spapi/handler.js";
+import { handle as h10, readRpc, READ_ONLY_TOOLS } from "../supabase/functions/h10mcp/handler.js";
+import { handle as account } from "../supabase/functions/account/handler.js";
 import { handle as status } from "../supabase/functions/status/handler.js";
 
 const ENV = { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", KEEPA_API_KEY: "KEEPA-SECRET-123", DATAFORSEO_LOGIN: "login@example.com", DATAFORSEO_PASSWORD: "DFS-SECRET-456",
@@ -38,7 +40,7 @@ test("method and CORS preflight", async () => {
 });
 test("status reports booleans only, never values", async () => {
   const r = await status(req({}), ENV, fetcher([])), t = await r.text();
-  assert.deepEqual(JSON.parse(t), { spapi: true, keepa: true, dataforseo: true, restricted_to_allowed_emails: false });
+  assert.deepEqual(JSON.parse(t), { spapi: true, keepa: true, h10mcp: false, account_delete: false, dataforseo: true, restricted_to_allowed_emails: false });
   for (const s of ["SECRET"]) assert.ok(!t.includes(s));
 });
 test("not configured gives 503 and no outbound call", async () => {
@@ -109,4 +111,62 @@ test("spapi bad credentials message hides secrets", async () => {
   const f = fetcher([["auth/o2/token", json({ error: "x" }, 400)]]);
   const r = await spapi(req({ marketplace: "CA", action: "catalog", asins: ["B000000001"] }), ENV, f), t = await r.text();
   assert.equal(r.status, 502); assert.ok(!/SECRET/.test(t));
+});
+
+// ---- Helium 10 MCP bridge: fake server speaking the JSON-RPC shape (JSON for some calls, SSE for others)
+function mcpServer({ token = "h10_mcp_GOODTOKEN", tools = [{ name: "search_products", description: "d", inputSchema: { type: "object" } }, { name: "sync_listing_to_amazon", description: "writes", inputSchema: {} }], callResult } = {}) {
+  const seen = [];
+  const f = fetcher([["mcp.helium10.com", async (url, init) => {
+    const b = JSON.parse(init.body); seen.push({ method: b.method, auth: init.headers.authorization, sid: init.headers["mcp-session-id"] });
+    if (init.headers.authorization !== token) return new Response("no", { status: 401 });
+    if (b.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: b.id, result: { protocolVersion: "2025-03-26" } }), { status: 200, headers: { "content-type": "application/json", "mcp-session-id": "S1" } });
+    if (b.method === "notifications/initialized") return new Response(null, { status: 202 });
+    if (b.method === "tools/list") return new Response(`event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: b.id, result: { tools } })}\n\n`, { status: 200, headers: { "content-type": "text/event-stream" } });
+    if (b.method === "tools/call") return new Response(JSON.stringify({ jsonrpc: "2.0", id: b.id, result: callResult || { content: [{ type: "text", text: JSON.stringify({ rows: [{ asin: "B000000001", revenue: null }] }) }] } }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response("?", { status: 404 });
+  }]]);
+  f.seen = seen; return f;
+}
+const E2 = { ...ENV, H10_MCP_TOKEN: "h10_mcp_GOODTOKEN" };
+test("h10mcp: not configured -> 503; needs login", async () => {
+  assert.equal((await h10(req({ action: "tools" }), ENV, mcpServer())).status, 503);
+  assert.equal((await h10(req({ action: "tools" }, { auth: "Bearer bad" }), E2, mcpServer())).status, 401);
+});
+test("h10mcp: handshake then tools/list over SSE; write tools flagged not allowed", async () => {
+  const f = mcpServer(), r = await h10(req({ action: "tools" }), E2, f), j = await r.json();
+  assert.equal(r.status, 200); assert.deepEqual(f.seen.map((x) => x.method), ["initialize", "notifications/initialized", "tools/list"]);
+  assert.equal(f.seen[2].sid, "S1"); assert.equal(f.seen[2].auth, "h10_mcp_GOODTOKEN");
+  assert.deepEqual(j.tools.map((t) => [t.name, t.allowed]), [["search_products", true], ["sync_listing_to_amazon", false]]);
+  assert.ok(!JSON.stringify(j).includes("GOODTOKEN"));
+});
+test("h10mcp: only allow-listed read tools can be called; nulls stay null", async () => {
+  const f = mcpServer();
+  assert.equal((await h10(req({ action: "call", tool: "sync_listing_to_amazon", arguments: {} }), E2, f)).status, 403);
+  assert.ok(!f.seen.some((x) => x.method === "tools/call"));
+  const r = await h10(req({ action: "call", tool: "search_products", arguments: { category: "kitchen" } }), E2, f), j = await r.json();
+  assert.equal(j.data.rows[0].revenue, null); assert.equal(j.tool, "search_products");
+  assert.ok(![...READ_ONLY_TOOLS].some((n) => /sync|generate|rewrite|publish|update|delete|create/.test(n)));
+});
+test("h10mcp: rejected token explained and never echoed", async () => {
+  const r = await h10(req({ action: "tools" }), { ...E2, H10_MCP_TOKEN: "h10_mcp_WRONG" }, mcpServer()), t = await r.text();
+  assert.equal(r.status, 502); assert.match(t, /rejected the API token/); assert.ok(!t.includes("WRONG"));
+});
+test("h10mcp: SSE parser picks the JSON-RPC message", async () => {
+  const j = await readRpc(new Response('event: ping\ndata: x\n\nevent: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"ok":1}}\n\n', { headers: { "content-type": "text/event-stream" } }));
+  assert.equal(j.result.ok, 1);
+});
+// ---- account deletion
+test("account: requires typed email; uses service key only server-side; never echoes it", async () => {
+  const E3 = { ...ENV, SUPABASE_SERVICE_ROLE_KEY: "SRV-SECRET-999" };
+  let deleted = null; const f = fetcher([["/auth/v1/admin/users/", (u, init) => { deleted = { u, init }; return json({}); }]]);
+  assert.equal((await account(req({ action: "delete", confirm: "nope" }), E3, f)).status, 400); assert.equal(deleted, null);
+  assert.equal((await account(req({ action: "delete", confirm: "me@example.com" }), ENV, f)).status, 503);
+  const r = await account(req({ action: "delete", confirm: "ME@example.com" }), E3, f);
+  assert.equal(r.status, 200); assert.match(deleted.u, /admin\/users\/u1$/); assert.equal(deleted.init.method, "DELETE");
+  assert.ok(!(await r.text()).includes("SRV-SECRET"));
+});
+test("account: cannot delete somebody else (id comes from the verified login, not the body)", async () => {
+  let url = null; const f = fetcher([["/auth/v1/admin/users/", (u) => { url = u; return json({}); }]]);
+  await account(req({ action: "delete", confirm: "me@example.com", user_id: "victim" }), { ...ENV, SUPABASE_SERVICE_ROLE_KEY: "k1234" }, f);
+  assert.ok(url.endsWith("/u1") && !url.includes("victim"));
 });

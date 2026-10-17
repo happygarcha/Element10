@@ -63,3 +63,10 @@ details summary{cursor:pointer;color:var(--accent)}
 @media print{nav.side,.noprint{display:none}.shell{display:block}body{background:#fff;color:#000}}
 
 #res2:empty{display:none}
+
+button.danger{background:var(--bad);color:#fff}
+nav.side .grp:first-child{margin-top:0}
+#toast{position:fixed;left:50%;bottom:16px;transform:translate(-50%,40px);opacity:0;pointer-events:none;background:var(--bad);color:#fff;padding:10px 16px;border-radius:8px;max-width:92vw;z-index:50;transition:.2s}
+#toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+pre{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace}

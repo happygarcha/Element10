@@ -1,0 +1,13 @@
+name: e2e
+# Real-browser tests in Chromium, Firefox and WebKit (Safari's engine). Uses a stand-in for Supabase, so it proves the client logic only.
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  browsers:
+    runs-on: ubuntu-latest
+    strategy: { fail-fast: false, matrix: { browser: [chromium, firefox, webkit] } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm i --no-save playwright-core@1.49.1 && npx playwright-core install --with-deps ${{ matrix.browser }}
+      - run: BROWSER=${{ matrix.browser }} NODE_PATH=$PWD/node_modules web/tests/e2e/run-all.sh

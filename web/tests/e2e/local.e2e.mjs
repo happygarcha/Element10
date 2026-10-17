@@ -1,8 +1,12 @@
-import { chromium } from "playwright-core";
+import * as pw from "playwright-core";
+import nodefs from "node:fs";
+const SANDBOX = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const launchBrowser = () => { const name = process.env.BROWSER || "chromium"; return pw[name].launch(name === "chromium" && nodefs.existsSync(SANDBOX) ? { executablePath: SANDBOX, args: ["--no-sandbox"] } : {}); };
+nodefs.mkdirSync("/tmp/pw", { recursive: true });
 import fs from "node:fs";
 const base = "http://127.0.0.1:8771/index.html";
 const results = []; const ok = (name, cond, extra = "") => { results.push([cond ? "PASS" : "FAIL", name, extra]); };
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome", args: ["--no-sandbox"] });
+const browser = await launchBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
 const page = await ctx.newPage(); const errors = [];
 page.on("pageerror", (e) => errors.push(e.message)); page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });

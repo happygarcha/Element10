@@ -25,3 +25,10 @@ REA 6.5.0 (`npx rea-agents`, run with `npm_config_ignore_scripts=true`, never `s
 
 ## How findings shaped the build
 Because REA showed the app is a static, same-origin bundle with no embedded secrets, the architecture rule holds: secrets exist only as Supabase function secrets; the browser holds only the public anon key and the user's login token.
+
+## Update 2026-10-17 (Milestone 3)
+- **Installed/available:** REA 6.5.0 is available through `npx rea-agents` (npm registry is reachable); the repository `morluto/rea` is cloned at `/home/user/morluto/rea` for its docs. `setup` was not run and is not needed for the browser tools.
+- **Public Helium 10 assets:** REA's browser tools need a browser that can load the page. From this environment every Helium 10 host (`www.`, `kb.`, `mcp.helium10.com`) fails at the egress proxy (curl exit 000, DNS/connection rejected), so **REA could not observe helium10.com's public pages, search workflows, filters, pagination, charts or exports**. That is a network restriction of this sandbox, not a refusal by REA or Helium 10. The investigation of those workflows is therefore **not done**; the matrix's Helium 10 column rests on the official MCP README (observed text) and secondary reviews (inferred).
+- **Workaround that is possible:** run REA yourself from a machine that can reach helium10.com, on pages you are authorised to view (public marketing/help pages, or your own logged-in session for workflows you are entitled to use), with `inspect-web-page` / `observe-web-session`; send the evidence JSON and it can be folded into the matrix. REA is not to be used to bypass login, read other users' data, or extract secrets.
+- **Evidence classes used in the matrix:** *observed* = text read from the official repository; *inferred* = third-party descriptions; *assumed* = nothing; every unverified item says so.
+- **Re-audit of Element10 itself** after Milestone 3: same method as before (same-origin only, no embedded keys). The service-role key exists only in the `account` function environment.

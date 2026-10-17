@@ -3,8 +3,8 @@
 import { uid } from "./util.js";
 
 export const TABLES = ["imports", "products", "observations", "watchlists", "watchlist_items", "alert_rules", "alerts", "keywords",
-  "keyword_observations", "fee_profiles", "settings", "projects", "project_items", "calc_runs", "ad_terms", "suppliers"];
-const TS = ["as_of", "first_seen", "uploaded_at", "created_at", "added_at", "triggered_at", "verified_at", "quoted_at"];
+  "keyword_observations", "fee_profiles", "settings", "projects", "project_items", "calc_runs", "ad_terms", "suppliers", "reviews", "provider_results"];
+const TS = ["as_of", "first_seen", "uploaded_at", "created_at", "added_at", "triggered_at", "verified_at", "quoted_at", "reviewed_at", "retrieved_at"];
 const iso = (v) => { if (!v) return v; const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toISOString().replace(/\.\d{3}Z$/, "Z"); };
 
 export class Store {
@@ -24,12 +24,20 @@ export class Store {
   async add(table, row) { return (await this.addMany(table, [row]))[0]; }
   async addMany(table, rows) {
     for (const r of rows) { r.id = r.id || uid(); this.t[table].push(r); if (table === "observations") this._idx(r); }
-    for (let i = 0; i < rows.length; i += 400) await this.adapter.insert(table, rows.slice(i, i + 400));
+    try { for (let i = 0; i < rows.length; i += 400) await this.adapter.insert(table, rows.slice(i, i + 400)); }
+    catch (e) { // do not show work as saved when the database refused it
+      const ids = new Set(rows.map((r) => r.id)); this.t[table] = this.t[table].filter((x) => !ids.has(x.id));
+      if (table === "observations") for (const [k, v] of this.obs) this.obs.set(k, v.filter((o) => !ids.has(o.id)));
+      throw e;
+    }
     return rows;
   }
   async update(table, id, patch) {
     const r = this.t[table].find((x) => x.id === id); if (!r) throw new Error(`${table} ${id} not found`);
-    Object.assign(r, patch); await this.adapter.update(table, id, patch); return r;
+    const before = {}; for (const k of Object.keys(patch)) before[k] = r[k];
+    Object.assign(r, patch);
+    try { await this.adapter.update(table, id, patch); } catch (e) { Object.assign(r, before); throw e; }
+    return r;
   }
   async remove(table, id) {
     this.t[table] = this.t[table].filter((x) => x.id !== id);

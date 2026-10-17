@@ -2,6 +2,6 @@
 import { endpoint } from "../_shared/common.js";
 export const handle = endpoint(async (_b, env) => ({
   spapi: !!(env.SPAPI_LWA_CLIENT_ID && env.SPAPI_LWA_CLIENT_SECRET && env.SPAPI_REFRESH_TOKEN),
-  keepa: !!env.KEEPA_API_KEY, dataforseo: !!(env.DATAFORSEO_LOGIN && env.DATAFORSEO_PASSWORD),
+  keepa: !!env.KEEPA_API_KEY, h10mcp: !!env.H10_MCP_TOKEN, account_delete: !!env.SUPABASE_SERVICE_ROLE_KEY, dataforseo: !!(env.DATAFORSEO_LOGIN && env.DATAFORSEO_PASSWORD),
   restricted_to_allowed_emails: !!env.ALLOWED_EMAILS,
 }), { perHour: 600 });

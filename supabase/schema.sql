@@ -78,12 +78,21 @@ create table if not exists public.suppliers (
   product_id uuid references public.products(id) on delete set null, name text not null, contact text, quote_unit_cost double precision,
   currency text, moq double precision, lead_days double precision, quoted_at timestamptz, notes text);
 
+create table if not exists public.reviews (
+  id uuid primary key, user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  product_id uuid references public.products(id) on delete cascade, marketplace text, rating double precision, title text, body text,
+  reviewed_at timestamptz, source text, kind text, import_id uuid);
+create index if not exists ix_reviews_product on public.reviews(product_id);
+create table if not exists public.provider_results (
+  id uuid primary key, user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  provider text not null, tool text, marketplace text, params jsonb, result jsonb, retrieved_at timestamptz, note text);
+
 -- Row-level security: a login can only read and write its own rows. Nothing is readable without logging in.
 do $$
 declare t text;
 begin
   foreach t in array array['imports','products','observations','watchlists','watchlist_items','alert_rules','alerts','keywords',
-                           'keyword_observations','fee_profiles','settings','projects','project_items','calc_runs','ad_terms','suppliers']
+                           'keyword_observations','fee_profiles','settings','projects','project_items','calc_runs','ad_terms','suppliers','reviews','provider_results']
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "own rows" on public.%I', t);

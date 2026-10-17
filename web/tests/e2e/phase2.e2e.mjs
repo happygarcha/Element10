@@ -1,8 +1,12 @@
 // Phase 2 + mobile checks. Uses the Supabase STAND-IN (see README): proves our client logic, not the real services.
-import { chromium } from "playwright-core";
+import * as pw from "playwright-core";
+import nodefs from "node:fs";
+const SANDBOX = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const launchBrowser = () => { const name = process.env.BROWSER || "chromium"; return pw[name].launch(name === "chromium" && nodefs.existsSync(SANDBOX) ? { executablePath: SANDBOX, args: ["--no-sandbox"] } : {}); };
+nodefs.mkdirSync("/tmp/pw", { recursive: true });
 import fs from "node:fs";
 const base = "http://127.0.0.1:8772/index.html"; const res = []; const ok = (n, c, x = "") => res.push([c ? "PASS" : "FAIL", n, x]);
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome", args: ["--no-sandbox"] });
+const b = await launchBrowser();
 const ctx = await b.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
 const p = await ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(e.message)); p.on("dialog", (d) => d.accept()); p.on("console", (m) => { if (m.type() === "error" && !/404|favicon/.test(m.text())) errs.push(m.text()); });
 await p.goto(base); await p.waitForSelector("#lf");

@@ -1,6 +1,10 @@
-import { chromium } from "playwright-core";
+import * as pw from "playwright-core";
+import nodefs from "node:fs";
+const SANDBOX = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const launchBrowser = () => { const name = process.env.BROWSER || "chromium"; return pw[name].launch(name === "chromium" && nodefs.existsSync(SANDBOX) ? { executablePath: SANDBOX, args: ["--no-sandbox"] } : {}); };
+nodefs.mkdirSync("/tmp/pw", { recursive: true });
 const base = "http://127.0.0.1:8772/index.html"; const res = []; const ok = (n, c, x = "") => res.push([c ? "PASS" : "FAIL", n, x]);
-const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome", args: ["--no-sandbox"] });
+const b = await launchBrowser();
 const p = await (await b.newContext()).newPage(); const errs = []; p.on("pageerror", (e) => errs.push(e.message));
 await p.goto(base); await p.waitForSelector("#lf");
 ok("signed-out visitor sees the login screen, not data", (await p.textContent("#app")).includes("Sign in") && !(await p.textContent("#app")).includes("Dashboard"));

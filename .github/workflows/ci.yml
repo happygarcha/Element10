@@ -17,3 +17,4 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: node --test web/tests/*.test.js tests/functions.test.js
+      - run: node tools/gen-parity-doc.mjs && git diff --exit-code docs/10-parity-matrix.md

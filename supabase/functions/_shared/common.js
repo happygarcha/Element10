@@ -20,7 +20,8 @@ export const reply = (req, env, body, status = 200) => new Response(JSON.stringi
 // Never let a secret leave the server, even inside an upstream error message.
 export function sanitise(text, env) {
   let t = String(text ?? "");
-  for (const k of ["SPAPI_LWA_CLIENT_SECRET", "SPAPI_REFRESH_TOKEN", "KEEPA_API_KEY", "DATAFORSEO_PASSWORD", "DATAFORSEO_LOGIN"]) if (env[k] && env[k].length > 3) t = t.split(env[k]).join("[hidden]");
+  for (const k of ["SPAPI_LWA_CLIENT_SECRET", "SPAPI_REFRESH_TOKEN", "KEEPA_API_KEY", "DATAFORSEO_PASSWORD", "DATAFORSEO_LOGIN", "H10_MCP_TOKEN", "SUPABASE_SERVICE_ROLE_KEY"]) if (env[k] && env[k].length > 3) t = t.split(env[k]).join("[hidden]");
+  t = t.replace(/h10_mcp_[A-Za-z0-9_-]+/g, "[hidden]");
   return t.slice(0, 300);
 }
 
