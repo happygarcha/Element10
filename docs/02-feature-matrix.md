@@ -22,7 +22,9 @@ Difficulty: S small, M medium, L large. Cost is the recurring cost of the data s
 | 6 | Watchlists and alerts (price, rank, any metric, % change) | Whatever you import | Built | S | 0 | 1 |
 | 6 | Automatic monitoring | Needs a live source on a schedule | Not built | M | paid | later |
 | 7 | Projects, CSV export, printable report | Stored numbers | Built | S | 0 | 1 |
-| 8 | Inventory planning, ad analysis | Seller reports | Not built | M | 0 | later |
+| 8 | Inventory planning | Numbers you enter | Built (web edition, phase 2) | S | 0 | 2 |
+| 8 | Ad search-term analysis | Your Amazon Ads export | Built (web edition, phase 2) | S | 0 | 2 |
+| 9 | Login + database, use from GitHub link on any device | Supabase free tier | Built, untested against a real Supabase project | M | 0 | 2 |
 | 8 | Browser extension | Would need data source and review | Not built | M | 0 | later |
 
 Why some items are not built: no accessible, permitted data source exists without a paid licence or a seller account, and

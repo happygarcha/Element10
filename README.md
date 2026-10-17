@@ -12,7 +12,11 @@ watchlists with price/rank alerts · CA/US profit calculator with break-even and
 listing audit · projects with CSV and printable reports · data-source map · demo mode with fictional data.
 See [docs/02-feature-matrix.md](docs/02-feature-matrix.md) for what needs paid data or a seller account.
 
-## Setup
+## Two editions
+- **Web edition (`web/`)**: runs in the browser, hosted on GitHub Pages, with login and your own free Supabase database so it works on every device. See [docs/06-hosting-and-login.md](docs/06-hosting-and-login.md).
+- **Python edition (`src/arp`)**: runs on your computer with a local SQLite file; the place for server-side secrets such as Amazon SP-API credentials.
+
+## Setup (Python edition)
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 cp .env.example .env            # optional; everything in it is optional
@@ -21,7 +25,7 @@ cp .env.example .env            # optional; everything in it is optional
 First: open **Settings**, enter the USD→CAD rate, and fill each fee profile from Seller Central's FBA Revenue Calculator, then tick "verified".
 Try everything with fictional data via **Switch to demo mode** (or `ARP_DEFAULT_MODE=demo`).
 
-## Tests and checks
+## Tests and checks (Python edition)
 ```bash
 .venv/bin/pytest -q && .venv/bin/ruff check src tests
 ```
@@ -29,4 +33,10 @@ Data lives in `data/live.db` and `data/demo.db` (SQLite). Back up by copying the
 
 ## Docs
 [research and sources](docs/01-research-and-sources.md) · [feature matrix](docs/02-feature-matrix.md) · [architecture](docs/03-architecture.md) ·
-[data integrity](docs/04-data-integrity.md) · [calculations](docs/05-calculations.md)
+[data integrity](docs/04-data-integrity.md) · [calculations](docs/05-calculations.md) · [hosting and login](docs/06-hosting-and-login.md) · [phase 2](docs/07-phase2.md)
+
+## Web edition tests
+```bash
+node --test web/tests/calc.test.js web/tests/data.test.js     # logic, imports, store, Supabase adapter (mocked)
+```
+Browser tests (optional) are described in `web/tests/e2e/README.md`.
