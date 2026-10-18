@@ -2,7 +2,7 @@
 
 Generated from `web/js/parity.js` by `node tools/gen-parity-doc.mjs`. The same data powers the in-app **Parity matrix** page.
 
-**Status of the project against this matrix:** 45 capabilities. implemented 8, partial 23, missing 8, blocked 6 (18% fully implemented).
+**Status of the project against this matrix:** 46 capabilities. implemented 8, partial 24, missing 8, blocked 6 (17% fully implemented).
 The platform is **not** complete. "Partial" means some of the capability works with the data you hold or connect; "blocked" means a licence, account or data source is required.
 
 Helium 10 facts: **official** = `helium10/Helium10-MCP` README (read 2026-10-17, the only first-party text reachable from the build environment); **secondary** = third-party reviews found in search results (helium10.com, its help centre and demos are unreachable from the build environment); **unverified** = not checked. Per-country feature lists were not available from any source, so none are claimed.
@@ -28,6 +28,7 @@ Helium 10 facts: **official** = `helium10/Helium10-MCP` README (read 2026-10-17,
 | PD8 | Saved searches (unverified) | Amazon (marketplaces: US, CA among many; per-country feature support not verified) | Saved product searches in Settings-backed list. Save current filters by name; reopen | n/a | Free | Saved search reproduces the same filter after reload and on another device | **implemented** | views.products savesearch; e2e on local/cloud stand-in; settings synced via Supabase | Saved keyword searches not built. |
 | PD9 | Compare products side by side (official) | Amazon (marketplaces: US, CA among many; per-country feature support not verified) | Compare page (up to 8) with scores. Tick products -> compare | Stored data | Free | Metrics aligned with source/date visible | **implemented** | views.compare; web/tests/data.test.js | No charts overlay. |
 | PD10 | Opportunity scoring (unverified) | Amazon (marketplaces: US, CA among many; per-country feature support not verified) | Transparent adjustable score that skips missing factors. Settings weights | Stored data | Free | Score explains each factor; missing data is skipped, not zero | **implemented** | web/tests/calc.test.js | Not comparable to any Helium 10 score (theirs is proprietary). |
+| PD11 | Niche / opportunity research (Amazon's own Product Opportunity Explorer and Helium 10 niche tools) (secondary) | Amazon (Opportunity Explorer availability for Canada not confirmed) | Niche report import: your own export, detected columns you confirm, sort/filter/CSV. Import -> confirm columns -> sort/filter niches | Your Seller Central export (no API exists for it) | Free; needs access to Opportunity Explorer in your account | Imported values equal the file's values; blanks stay blank; source and period shown | **partial** | web/tests/phase3.test.js (importNiches); e2e phase3 | Manual export only: no automatic collection. Column meanings are whatever the file's headers say; no cross-niche scoring yet. |
 
 ### Market analysis
 | ID | Helium 10 capability (ref) | Platforms | Element10 equivalent / workflow | Data source | Access and cost | Acceptance criterion | Status | Evidence | Remaining difference |
@@ -97,6 +98,6 @@ Helium 10 runs Xray-style research on Amazon pages from a Chrome extension. Repr
 
 ## Status counts
 - implemented: 8
-- partial: 23
+- partial: 24
 - missing: 8
 - blocked: 6

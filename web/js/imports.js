@@ -117,3 +117,31 @@ export async function importAdTerms(store, text, { marketplace, source_label, fi
   await store.update("imports", imp.id, { rows_ok: out.length, rows_skipped: skipped });
   return { import_id: imp.id, ok: out.length, skipped, problems: [] };
 }
+
+// ---- Niche reports (for example an export from Amazon's Product Opportunity Explorer that you downloaded from your own Seller Central).
+// Column names are not assumed: the name column is detected (or chosen) and every mostly-numeric column becomes a metric, keeping the
+// header text as its label. Nothing is renamed to a metric we cannot vouch for; values are user_supplied from the source label you give.
+export const NICHE_NAME_ALIASES = ["niche", "niche name", "niche title", "name", "title", "search term", "keyword", "product group", "category"];
+export const metricKey = (h) => String(h).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+export function analyseNicheColumns(headers, rows) {
+  const norm = new Map(headers.map((h) => [h.trim().toLowerCase().replace(/\s+/g, " "), h]));
+  let nameCol = null; for (const n of NICHE_NAME_ALIASES) if (norm.has(n)) { nameCol = norm.get(n); break; }
+  if (!nameCol) nameCol = headers.find((h) => rows.slice(0, 20).some((r) => (r[h] || "").trim() && parseNumber(r[h]) === null)) || headers[0];
+  const metricCols = headers.filter((h) => h !== nameCol && (() => { const vals = rows.map((r) => (r[h] || "").trim()).filter(Boolean); return vals.length > 0 && vals.filter((v) => parseNumber(v) !== null).length / vals.length >= 0.6; })());
+  return { nameCol, metricCols };
+}
+export async function importNiches(store, text, { marketplace, source_label, period = "", filename = "niches.csv", as_of = null, mapping = null, kind = "user_supplied" }) {
+  if (!["CA", "US"].includes(marketplace)) throw new Error("marketplace must be CA or US");
+  if (!["user_supplied", "sample"].includes(kind)) throw new Error("imports can only be user_supplied or sample");
+  const { headers, rows } = parseCSV(text); if (!rows.length) throw new Error("The file has no data rows.");
+  const auto = analyseNicheColumns(headers, rows), nameCol = (mapping && mapping.nameCol) || auto.nameCol, metricCols = (mapping && mapping.metricCols) || auto.metricCols;
+  if (!headers.includes(nameCol)) throw new Error("Name column not found in the file.");
+  const stamp = as_of || now(), imp = await recordImport(store, { filename, kind: "niches", source_label, marketplace }), out = []; let skipped = 0;
+  for (const r of rows) {
+    const name = (r[nameCol] || "").trim(); if (!name) { skipped++; continue; }
+    const metrics = {}, units = {}; for (const h of metricCols) { const v = parseNumber(r[h]); if (v !== null) { metrics[metricKey(h)] = v; units[metricKey(h)] = h; } }
+    out.push({ marketplace, name, period, metrics, labels: units, raw: Object.fromEntries(headers.map((h) => [h, r[h]])), as_of: stamp, source: source_label, kind, import_id: imp.id });
+  }
+  await store.addMany("niches", out); await store.update("imports", imp.id, { rows_ok: out.length, rows_skipped: skipped });
+  return { import_id: imp.id, ok: out.length, skipped, nameCol, metricCols };
+}

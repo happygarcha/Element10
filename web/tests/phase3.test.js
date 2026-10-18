@@ -41,3 +41,16 @@ test("parity matrix: valid statuses, unique ids, evidence required for implement
   }
   const s = summary(); assert.equal(s.total, PARITY.length); assert.ok(s.pct_implemented < 100);
 });
+
+import { importNiches, analyseNicheColumns } from "../js/imports.js";
+import { MemoryAdapter, Store } from "../js/store.js";
+test("niche import: detects name + numeric columns, keeps headers as labels, blanks stay out, percents parsed", async () => {
+  const s = new Store(new MemoryAdapter()), csv = "Niche Title,Search Volume (90d),Click Share %,Avg Price,Notes\nyoga mat,\"12,000\",34.5%,25.99,seasonal\nempty niche,,,,x\n,5,5,5,\n";
+  const a = analyseNicheColumns(["Niche Title", "Search Volume (90d)", "Click Share %", "Avg Price", "Notes"], [{ "Niche Title": "yoga mat", "Search Volume (90d)": "12,000", "Click Share %": "34.5%", "Avg Price": "25.99", Notes: "seasonal" }]);
+  assert.equal(a.nameCol, "Niche Title"); assert.deepEqual(a.metricCols, ["Search Volume (90d)", "Click Share %", "Avg Price"]);
+  const r = await importNiches(s, csv, { marketplace: "CA", source_label: "my export", period: "last 90 days" });
+  assert.equal(r.ok, 2); assert.equal(r.skipped, 1);
+  const n = s.t.niches[0]; assert.equal(n.metrics.search_volume_90d, 12000); assert.equal(n.metrics.click_share, 34.5); assert.equal(n.labels.click_share, "Click Share %"); assert.equal(n.kind, "user_supplied");
+  assert.deepEqual(s.t.niches[1].metrics, {});                  // empty cells never become zeros
+  await assert.rejects(importNiches(s, csv, { marketplace: "DE", source_label: "x" })); await assert.rejects(importNiches(s, csv, { marketplace: "CA", source_label: "x", kind: "observed" }));
+});

@@ -3,7 +3,7 @@
 import { uid } from "./util.js";
 
 export const TABLES = ["imports", "products", "observations", "watchlists", "watchlist_items", "alert_rules", "alerts", "keywords",
-  "keyword_observations", "fee_profiles", "settings", "projects", "project_items", "calc_runs", "ad_terms", "suppliers", "reviews", "provider_results"];
+  "keyword_observations", "fee_profiles", "settings", "projects", "project_items", "calc_runs", "ad_terms", "suppliers", "reviews", "provider_results", "niches"];
 const TS = ["as_of", "first_seen", "uploaded_at", "created_at", "added_at", "triggered_at", "verified_at", "quoted_at", "reviewed_at", "retrieved_at"];
 const iso = (v) => { if (!v) return v; const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toISOString().replace(/\.\d{3}Z$/, "Z"); };
 

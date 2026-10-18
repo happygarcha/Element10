@@ -38,6 +38,15 @@ await p.goto(base + "#/import"); await p.fill("input[name=source_label]", "t"); 
 await p.goto(base + "#/reviews"); await p.selectOption("#rp select", { index: 1 }); await p.click("#rp button"); await p.waitForSelector("#ri");
 await p.setInputFiles("#ri input[type=file]", "/tmp/pw/rev.csv"); await p.fill("#ri input[name=src]", "my export"); await p.click("#ri button"); await p.waitForSelector("#rmsg.pill-ok, #rmsg.pill-bad"); await p.waitForSelector("h3:text-is('Complaint themes')");
 t = await p.textContent("#view"); ok("reviews imported (invalid rating skipped) and themes counted", t.includes("Breaks / stops working") && t.includes("anecdotes"));
+// niche report import
+fs.writeFileSync("/tmp/pw/niche.csv", "Niche Title,Search Volume,Click Share %,Avg Price,Notes\nyoga mat,\"12,000\",34.5%,25.99,a\nfoam roller,800,10%,18,b\nbroken,,,,c\n");
+await p.goto(base + "#/niches"); await p.setInputFiles("#ni input[type=file]", "/tmp/pw/niche.csv"); await p.waitForSelector("#ncol");
+ok("niche import detects the name column and numeric columns", (await p.inputValue("#ncol")) === "Niche Title" && (await p.$$eval(".mc:checked", (e) => e.length)) === 3);
+await p.fill("#ni input[name=period]", "last 90 days"); await p.click("#nibtn"); await p.waitForSelector("#nf");
+await p.selectOption("#nf select[name=sort]", "search_volume"); await p.click("#nf button:not(.ghost)"); await p.waitForFunction(() => document.querySelector("table td") && document.querySelector("table td").textContent === "yoga mat");
+t = await p.textContent("#view"); ok("niches listed, sorted high to low, blank niche shows dashes", t.includes("12,000") && t.includes("foam roller") && t.includes("last 90 days"));
+const nst = JSON.parse(await p.evaluate(() => sessionStorage.getItem("stubdb")));
+ok("stored as the user's own export with provenance", nst.niches.length === 3 && nst.niches.every((n) => n.kind === "user_supplied" && n.source.includes("my export")) && Object.keys(nst.niches[2].metrics).length === 0);
 // failure handling: a refused save must not look saved
 await p.evaluate(() => { window.__stub.failInsert = true; });
 await p.goto(base + "#/suppliers"); await p.fill("input[name=name]", "Ghost Co"); await p.click("#sf button"); await p.waitForSelector("#toast.show");

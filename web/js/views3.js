@@ -3,12 +3,12 @@ import { callFn } from "./live.js";
 import { overlapGap, processKeywords } from "./calc/keywords.js";
 import { DEFAULT_THEMES, analyseReviews } from "./calc/reviews.js";
 import { parseCSV } from "./csv.js";
-import { detectMapping, parseNumber } from "./imports.js";
+import { analyseNicheColumns, detectMapping, importNiches, parseNumber } from "./imports.js";
 import { PARITY, PLATFORMS, STATUSES, summary } from "./parity.js";
 import { latest } from "./services.js";
 import { h, kindChip, mpChip, raw, toCSV, download } from "./ui.js";
 import { liveStatus, resetStatus } from "./views2.js";
-import { now, num, uid } from "./util.js";
+import { fnum, now, num, uid } from "./util.js";
 
 const empty = (m) => h`<div class="empty">${raw(m)}</div>`;
 const fd = (f) => Object.fromEntries(new FormData(f).entries());
@@ -189,5 +189,41 @@ export async function reviews({ store, q, refresh }) {
           const out = []; let skipped = 0; for (const x of r) { const rating = parseNumber(x[map.rating]); if (rating == null || rating < 1 || rating > 5) { skipped++; continue; } out.push({ product_id: pid, marketplace: p.marketplace, rating, title: map.title ? x[map.title] : "", body: (x[map.body] || "").slice(0, 4000), reviewed_at: map.date && !isNaN(Date.parse(x[map.date])) ? new Date(x[map.date]).toISOString() : null, source: fd(ri).src, kind: "user_supplied", import_id: imp.id }); }
           await store.addMany("reviews", out); await store.update("imports", imp.id, { rows_ok: out.length, rows_skipped: skipped }); say(root, "#rmsg", true, `Imported ${out.length}, skipped ${skipped} (invalid rating).`); setTimeout(refresh, 700);
         } catch (err) { say(root, "#rmsg", false, err.message); } });
+    } };
+}
+
+// ---------------- niche reports (exports you download from your own Seller Central, e.g. Product Opportunity Explorer) ----------------
+export async function niches({ store, q, refresh }) {
+  const mp = q.get("marketplace") || "CA", text = (q.get("q") || "").toLowerCase(), all = store.t.niches.filter((n) => n.marketplace === mp);
+  const labelOf = new Map(); for (const n of all) for (const [k, v] of Object.entries(n.labels || {})) if (!labelOf.has(k)) labelOf.set(k, v);
+  const count = new Map(); for (const n of all) for (const k of Object.keys(n.metrics || {})) count.set(k, (count.get(k) || 0) + 1);
+  const keys = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k), sortKey = q.get("sort") || "", dir = q.get("dir") === "asc" ? 1 : -1, min = fnum(q.get("min"));
+  let rows = all.filter((n) => (!text || n.name.toLowerCase().includes(text)) && (min == null || !sortKey || (n.metrics[sortKey] != null && n.metrics[sortKey] >= min)));
+  if (sortKey) rows = rows.slice().sort((a, b) => { const x = a.metrics[sortKey], y = b.metrics[sortKey]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (x - y) * dir; });
+  const shown = keys.slice(0, 8);
+  return { html: h`<h2>Niche research</h2><p class="sub">Import a niche report you downloaded from your own Seller Central (for example Product Opportunity Explorer). Element10 does not log in to Amazon or collect this data itself; the numbers are exactly what your file contained, labelled as your own export. ${kindChip("user_supplied")}</p>
+  <form class="card" id="ni"><div class="row"><div><label>Marketplace</label><select name="marketplace"><option value="CA">Amazon.ca</option><option value="US">Amazon.com</option></select></div>
+  <div><label>Period shown in the report (as you read it)</label><input type="text" name="period" placeholder="e.g. last 90 days" maxlength="60"></div>
+  <div><label>Source label</label><input type="text" name="src" value="Amazon Product Opportunity Explorer (my export)" maxlength="80" required></div></div>
+  <label>CSV file</label><input type="file" accept=".csv,text/csv" required><div id="nmap"></div><p><button id="nibtn">Import</button> <span id="nimsg" aria-live="polite"></span></p></form>
+  <p><a class="btn ${mp === "CA" ? "" : "ghost"}" href="#/niches?marketplace=CA">Amazon.ca</a> <a class="btn ${mp === "US" ? "" : "ghost"}" href="#/niches?marketplace=US">Amazon.com</a></p>
+  ${!all.length ? empty("No niches imported for this marketplace yet.") : h`<form class="card filters" id="nf"><input type="hidden" name="marketplace" value="${mp}"><div class="row"><div><label>Search</label><input type="search" name="q" value="${q.get("q") || ""}"></div>
+  <div><label>Sort by</label><select name="sort"><option value="">(file order)</option>${keys.map((k) => h`<option value="${k}" ${raw(k === sortKey ? "selected" : "")}>${labelOf.get(k) || k}</option>`)}</select></div>
+  <div><label>Direction</label><select name="dir"><option value="desc" ${raw(dir === -1 ? "selected" : "")}>High to low</option><option value="asc" ${raw(dir === 1 ? "selected" : "")}>Low to high</option></select></div>
+  <div><label>Minimum of the sort column</label><input type="number" step="any" name="min" value="${q.get("min") || ""}"></div></div><p style="margin:10px 0 0"><button>Apply</button> <button type="button" class="ghost" id="ncsv">Download CSV</button></p></form>
+  <p class="sub">${rows.length} of ${all.length} niches. Values show exactly what the file contained; a missing value shows – and is never filled in.</p>
+  <div class="card wrap"><table><tr><th>Niche</th>${shown.map((k) => h`<th class="n">${labelOf.get(k) || k}</th>`)}<th>Source</th></tr>${rows.slice(0, 500).map((n) => h`<tr><td>${n.name}</td>${shown.map((k) => h`<td class="n">${n.metrics[k] != null ? num(n.metrics[k], Number.isInteger(n.metrics[k]) ? 0 : 2) : "–"}</td>`)}<td><small>${n.period || ""} ${(n.as_of || "").slice(0, 10)}</small></td></tr>`)}</table></div>${rows.length > 500 ? h`<p class="sub">First 500 shown; the CSV has all.</p>` : ""}`}`,
+    after(root) {
+      let file = null, det = null;
+      const f = root.querySelector("#ni"), inp = f.querySelector("input[type=file]"), box = root.querySelector("#nmap");
+      inp.addEventListener("change", async () => {
+        file = inp.files[0]; if (!file) return; const { headers, rows } = parseCSV(await file.text()); det = analyseNicheColumns(headers, rows);
+        box.innerHTML = h`<div class="notice"><b>Check the detected columns.</b> Name column: <select id="ncol">${headers.map((x) => h`<option ${raw(x === det.nameCol ? "selected" : "")}>${x}</option>`)}</select><br>Numeric columns to keep:<div class="row">${headers.map((x) => h`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" style="width:auto" class="mc" value="${x}" ${raw(det.metricCols.includes(x) ? "checked" : "")}> ${x}</label>`)}</div><span class="sub">${rows.length} rows found.</span></div>`.__raw;
+      });
+      f.addEventListener("submit", async (e) => { e.preventDefault(); if (!file) return;
+        const d = fd(f); try { const r = await importNiches(store, await file.text(), { marketplace: d.marketplace, source_label: d.src, period: d.period || "", filename: file.name, mapping: { nameCol: root.querySelector("#ncol").value, metricCols: [...root.querySelectorAll(".mc:checked")].map((x) => x.value) } });
+          say(root, "#nimsg", true, `Imported ${r.ok} niches (${r.skipped} skipped, no name).`); setTimeout(() => { location.hash = "#/niches?marketplace=" + d.marketplace; refresh(); }, 600); } catch (err) { say(root, "#nimsg", false, err.message); } });
+      const nf = root.querySelector("#nf"); if (nf) { nf.addEventListener("submit", (e) => { e.preventDefault(); const p = new URLSearchParams(); for (const [k, v] of Object.entries(fd(nf))) if (v) p.set(k, v); location.hash = "#/niches?" + p; });
+        root.querySelector("#ncsv").addEventListener("click", () => { const cols = ["niche", ...keys.map((k) => labelOf.get(k) || k), "period", "source", "as_of"]; download(`niches-${mp}.csv`, toCSV(cols, rows.map((n) => Object.fromEntries([["niche", n.name], ...keys.map((k) => [labelOf.get(k) || k, n.metrics[k] ?? ""]), ["period", n.period], ["source", n.source], ["as_of", n.as_of]])))); }); }
     } };
 }
